@@ -12,7 +12,8 @@ import pkgutil
 import uvicorn
 
 # /////////////////////////////////////////////////
-app = FastAPI(title="helma", description="API for helma shop", version="1.0.0", responses={
+app = FastAPI(title="helma", description="API for helma shop", version="1.0.0",docs_url="/docs",
+    openapi_url="/openapi.json", responses={
     422: {
         "description": "Validation Error Example",
         "content": {
