@@ -15,55 +15,31 @@ router = APIRouter(prefix="/helma-shop-api/v1/store", tags=["Store"])
 
 @router.post("/create", response_model=StoreOut)
 def create_or_update_store(
-        name: str = Form(None),
         phone: str = Form(None),
         address: str = Form(None),
-
         instagram: str = Form(None),
+        bale: str = Form(None),
+        eita: str = Form(None),
+        rubika: str = Form(None),
         telegram: str = Form(None),
         whatsapp: str = Form(None),
-
-        lat: float = Form(None),
-        lng: float = Form(None),
-
-        logo: UploadFile = File(None),
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    UPLOAD_DIR = "uploads/stores"
 
     store = db.query(Store).filter(Store.owner_id == current_user.id).first()
 
-    logo_url = None
-
-    if logo:
-        if not logo.content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400,
-                detail={"field": "logo", "message": "لوگو باید فرمت تصویری باشد"}
-            )
-
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-        ext = os.path.splitext(logo.filename)[1]
-        filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-
-        with open(file_path, "wb") as buffer:
-            buffer.write(logo.file.read())
-
-        logo_url = f"/uploads/stores/{filename}"
-
     if store:
         update_data = {
-            "name": name,
             "phone": phone,
             "address": address,
             "instagram": instagram,
             "telegram": telegram,
             "whatsapp": whatsapp,
-            "lat": lat,
-            "lng": lng,
+            "whatsapp": whatsapp,
+            "rubika": rubika,
+            "eita": eita,
+            "bale": bale,
         }
 
         for key, value in update_data.items():
@@ -81,11 +57,11 @@ def create_or_update_store(
             telegram=telegram,
             whatsapp=whatsapp,
             address=address,
-            logo=logo_url,
+            rubika=rubika,
             phone=phone,
-            name=name,
-            lat=lat,
-            lng=lng,
+            eita=eita,
+            bale=bale,
+
         )
         db.add(store)
 
