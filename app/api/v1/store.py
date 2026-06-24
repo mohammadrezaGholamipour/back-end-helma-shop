@@ -11,10 +11,10 @@ import os
 router = APIRouter(prefix="/helma-shop-api/v1/store", tags=["Store"])
 
 
-# ===================== CREATE / UPDATE STORE =====================
+# ===================== CREATE STORE =====================
 
 @router.post("/create", response_model=StoreOut)
-def create_or_update_store(
+def create_store(
         phone: str = Form(None),
         address: str = Form(None),
         instagram: str = Form(None),
@@ -70,6 +70,48 @@ def create_or_update_store(
 
     return store
 
+
+# ===================== UPDATE STORE =====================
+
+@router.put("/update", response_model=StoreOut)
+def update_store(
+        instagram: str | None = Form(None),
+        telegram: str | None = Form(None),
+        whatsapp: str | None = Form(None),
+        bale: str | None = Form(None),
+        eita: str | None = Form(None),
+        rubika: str | None = Form(None),
+        address: str | None = Form(None),
+        phone: str | None = Form(None),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    store = db.query(Store).filter(Store.owner_id == current_user.id).first()
+    if not store:
+        raise HTTPException(
+            status_code=404,
+            detail={"field": "store", "message": "فروشگاه مورد نظر یافت نشد"}
+        )
+    update_data = {
+        "instagram": instagram,
+        "telegram": telegram,
+        "whatsapp": whatsapp,
+        "bale": bale,
+        "eita": eita,
+        "rubika": rubika,
+        "address": address,
+        "phone": phone,
+    }
+
+    for key, value in update_data.items():
+        if value is not None:
+            setattr(store, key, value)
+
+    db.add(store)
+    db.commit()
+    db.refresh(store)
+
+    return store
 
 # ===================== Get =====================
 
