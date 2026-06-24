@@ -73,7 +73,7 @@ def create_or_update_store(
 
 # ===================== Get =====================
 
-@router.get("/my_store", response_model=StoreOut)
+@router.get("/me", response_model=StoreOut)
 def get_my_store(
         application_id: str | None = None,
         db: Session = Depends(get_db),
