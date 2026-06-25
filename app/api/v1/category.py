@@ -1,7 +1,8 @@
+from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException ,Query
 from app.schemas.category import CategoryOut, CreateAndUpdateCategory
-from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException
 from app.core.security import get_current_user
 from app.models.category import Category
+from app.models.product import Product
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import User
@@ -89,6 +90,51 @@ def delete_category(
     db.delete(category)
     db.commit()
     return {"message": "دسته بندی و تمام محصولات زیرمجموعه حذف شدند"}
+
+# ===================== get category products =====================
+@router.get("/{slug}")
+def get_category_products(
+    slug: str,
+    application_id: int | None = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(12, ge=1, le=100),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    category_query = db.query(Category).filter(Category.slug == slug)
+
+    if application_id:
+        category_query = category_query.filter(Category.application_id == application_id)
+
+    category = category_query.first()
+
+    if not category:
+        raise HTTPException(status_code=404, detail={"message": "دسته‌بندی یافت نشد"})
+
+    products_query = db.query(Product).filter(Product.category_id == category.id)
+
+    if search:
+        products_query = products_query.filter(Product.name.ilike(f"%{search}%"))
+
+    total = products_query.count()
+
+    products = (
+        products_query
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    last_page = (total + per_page - 1) // per_page
+
+    return {
+        "category": category,
+        "products": products,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "last_page": last_page,
+    }
 
 # ===================== update =====================
 @router.put("/update", response_model=CategoryOut)

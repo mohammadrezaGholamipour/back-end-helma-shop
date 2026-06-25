@@ -1,8 +1,8 @@
-from app.schemas.product import ProductOut
 from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query
 from app.core.security import get_current_user
-from app.models.product import Product
+from app.schemas.product import ProductOut
 from app.models.category import Category
+from app.models.product import Product
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import User
