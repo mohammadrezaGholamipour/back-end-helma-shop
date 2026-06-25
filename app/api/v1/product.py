@@ -1,68 +1,67 @@
-from app.schemas.product import ProductOut, CreateAndUpdateProduct
-from fastapi import APIRouter, Depends, Form, UploadFile, File
+from app.schemas.product import ProductOut
+from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query
 from app.core.security import get_current_user
 from app.models.product import Product
 from app.models.category import Category
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from fastapi import HTTPException
 from app.models import User
 import uuid
 import os
 
 router = APIRouter(prefix="/helma-shop-api/v1/product", tags=["Product"])
 
+UPLOAD_DIR = "uploads/products"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ===================== CREATE PRODUCT =====================
 @router.post("/create", response_model=ProductOut)
 def create_product(
-        name: str = Form(...),
-        price: int = Form(...),
-        volume: int = Form(...),
-        description: str | None = Form(None),
-        category_id: int = Form(...),
-        image: UploadFile = File(None),
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    name: str = Form(...),
+    slug: str = Form(...), # اضافه شده برای سئو
+    price: int = Form(...),
+    volume: int = Form(...),
+    description: str | None = Form(None),
+    meta_title: str | None = Form(None), # اضافه شده
+    meta_description: str | None = Form(None), # اضافه شده
+    category_id: int = Form(...),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    UPLOAD_DIR = "uploads/products"
-
+    # بررسی دسترسی به دسته‌بندی
     category = db.query(Category).filter(
         Category.id == category_id,
         Category.owner_id == current_user.id
     ).first()
 
     if not category:
-        raise HTTPException(
-            status_code=404,
-            detail={"field": "Category", "message": "دسته‌بندی یافت نشد یا متعلق به شما نیست"}
-        )
+        raise HTTPException(status_code=404, detail={"message": "دسته‌بندی یافت نشد"})
+
+    # بررسی تکراری نبودن اسلاگ محصول
+    if db.query(Product).filter(Product.slug == slug).first():
+        raise HTTPException(status_code=400, detail={"message": "این اسلاگ (URL) قبلاً برای محصول دیگری ثبت شده است"})
 
     image_url = None
-
     if image:
         if not image.content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400,
-                detail={"field": "Product", "message": "فایل باید تصویر باشد"}
-            )
-
+            raise HTTPException(status_code=400, detail={"message": "فایل باید تصویر باشد"})
+        
         ext = os.path.splitext(image.filename)[1]
         filename = f"{uuid.uuid4().hex}{ext}"
         file_path = os.path.join(UPLOAD_DIR, filename)
-
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
         with open(file_path, "wb") as buffer:
             buffer.write(image.file.read())
-
         image_url = f"/uploads/products/{filename}"
 
     product = Product(
         name=name,
+        slug=slug,
         price=price,
         volume=volume,
         description=description,
+        meta_title=meta_title,
+        meta_description=meta_description,
         category_id=category_id,
         image=image_url
     )
@@ -70,170 +69,101 @@ def create_product(
     db.add(product)
     db.commit()
     db.refresh(product)
-
     return product
-
 
 # ===================== LIST (MY PRODUCTS) =====================
 @router.get("/me", response_model=list[ProductOut])
 def get_my_products(
-        search: str | None = None,
-        min_price: int | None = None,
-        max_price: int | None = None,
-        min_volume: int | None = None,
-        max_volume: int | None = None,
-        db: Session = Depends(get_db),
-        application_id: str | None = None,
+    application_id: str = Query(...), # اجباری کردن پارامتر
+    search: str | None = None,
+    min_price: int | None = None,
+    max_price: int | None = None,
+    db: Session = Depends(get_db)
 ):
-    if application_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "field": "application_id",
-                "message": "شناسه اپلیکیشن ارسال نشده است"
-            }
-        )
-    query = (
-        db.query(Product)
-        .filter(Product.category.has(application_id=application_id))
-    )
+    # استفاده از Join برای کوئری دقیق‌تر بر اساس اپلیکیشن
+    query = db.query(Product).join(Category).filter(Category.application_id == application_id)
 
-    # 🔍 search by name
     if search:
-        query = query.filter(
-            Product.name.ilike(f"%{search}%")
-        )
-
-    # 💰 price range
+        query = query.filter(Product.name.ilike(f"%{search}%"))
     if min_price is not None:
         query = query.filter(Product.price >= min_price)
-
     if max_price is not None:
         query = query.filter(Product.price <= max_price)
 
-    # ⚖️ volume (weight) range
-    if min_volume is not None:
-        query = query.filter(Product.volume >= min_volume)
-
-    if max_volume is not None:
-        query = query.filter(Product.volume <= max_volume)
-
-    products = query.all()
-    return products
-
+    return query.all()
 
 # ===================== DELETE PRODUCT =====================
-
-@router.delete("/delete")
+@router.delete("/delete/{product_id}")
 def delete_product(
-        product_id: int | None = None,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    if product_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail={"field": "product_id", "message": "شناسه محصول ارسال نشده است"}
-        )
-
-    product = (
-        db.query(Product)
-        .join(Category)
-        .filter(
-            Product.id == product_id,
-            Category.owner_id == current_user.id
-        )
-        .first()
-    )
+    product = db.query(Product).join(Category).filter(
+        Product.id == product_id,
+        Category.owner_id == current_user.id
+    ).first()
 
     if not product:
-        raise HTTPException(
-            status_code=404,
-            detail={"field": "Product", "message": "محصول یافت نشد یا متعلق به شما نیست"}
-        )
+        raise HTTPException(status_code=404, detail={"message": "محصول یافت نشد"})
 
     db.delete(product)
     db.commit()
-
     return {"message": "محصول با موفقیت حذف شد"}
-
 
 # ===================== UPDATE PRODUCT =====================
 @router.put("/update", response_model=ProductOut)
 def update_product(
-        product_id: int = Form(...),
-        name: str | None = Form(None),
-        price: int | None = Form(None),
-        volume: int | None = Form(None),
-        description: str | None = Form(None),
-        category_id: int | None = Form(None),
-        image: UploadFile = File(None),
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    product_id: int = Form(...),
+    name: str | None = Form(None),
+    slug: str | None = Form(None), # اضافه شده
+    price: int | None = Form(None),
+    volume: int | None = Form(None),
+    description: str | None = Form(None),
+    meta_title: str | None = Form(None),
+    meta_description: str | None = Form(None),
+    category_id: int | None = Form(None),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    UPLOAD_DIR = "uploads/products"
-
-    product = (
-        db.query(Product)
-        .join(Category)
-        .filter(
-            Product.id == product_id,
-            Category.owner_id == current_user.id
-        )
-        .first()
-    )
+    product = db.query(Product).join(Category).filter(
+        Product.id == product_id,
+        Category.owner_id == current_user.id
+    ).first()
 
     if not product:
-        raise HTTPException(
-            status_code=404,
-            detail={"field": "Product", "message": "محصول یافت نشد یا متعلق به شما نیست"}
-        )
+        raise HTTPException(status_code=404, detail={"message": "محصول یافت نشد"})
 
-    # If changing category, ensure it belongs to current user
-    if category_id is not None and category_id != product.category_id:
-        new_cat = db.query(Category).filter(
-            Category.id == category_id,
-            Category.owner_id == current_user.id
-        ).first()
+    if category_id:
+        # چک کردن مالکیت دسته‌بندی جدید
+        new_cat = db.query(Category).filter(Category.id == category_id, Category.owner_id == current_user.id).first()
         if not new_cat:
-            raise HTTPException(
-                status_code=404,
-                detail={"field": "Category", "message": "دسته بندی جدید یافت نشد یا متعلق به شما نیست"}
-            )
+            raise HTTPException(status_code=400, detail={"message": "دسته بندی نامعتبر"})
         product.category_id = category_id
 
-    if name is not None:
-        product.name = name
+    if slug:
+        # چک کردن تکراری نبودن اسلاگ جدید
+        existing = db.query(Product).filter(Product.slug == slug, Product.id != product_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail={"message": "این اسلاگ قبلاً ثبت شده است"})
+        product.slug = slug
 
-    if price is not None:
-        product.price = price
-
-    if volume is not None:
-        product.volume = volume
-
-    if description is not None:
-        product.description = description
+    if name: product.name = name
+    if price: product.price = price
+    if volume: product.volume = volume
+    if description: product.description = description
+    if meta_title: product.meta_title = meta_title
+    if meta_description: product.meta_description = meta_description
 
     if image:
-        if not image.content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400,
-                detail={"field": "Product", "message": "فایل باید تصویر باشد"}
-            )
-
         ext = os.path.splitext(image.filename)[1]
         filename = f"{uuid.uuid4().hex}{ext}"
         file_path = os.path.join(UPLOAD_DIR, filename)
-
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
         with open(file_path, "wb") as buffer:
             buffer.write(image.file.read())
-
         product.image = f"/uploads/products/{filename}"
 
-    db.add(product)
     db.commit()
     db.refresh(product)
-
     return product
