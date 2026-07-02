@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query
+from app.services.social_manager import notify_new_product
 from app.core.security import get_current_user
-from app.services.eitaa import send_product
 from app.schemas.product import ProductOut
 from app.models.category import Category
 from app.models.product import Product
@@ -73,24 +73,14 @@ def create_product(
     db.commit()
     db.refresh(product)
 
-    if product.image:
-        caption = f"""
-📦 {product.name}
-
-💰 قیمت:
-{product.price:,} تومان
-
-⚖️ وزن:
-{product.volume} گرم
-"""
-
-        background_tasks.add_task(
-            send_product,
-            product.image.lstrip("/"),
-            product.name,
-            caption,
-        )
-
+    background_tasks.add_task(
+        notify_new_product,
+        product.image,
+        product.name,
+        product.price,
+        product.volume
+    )
+    
     return product
 
 # ===================== LIST (MY PRODUCTS) =====================

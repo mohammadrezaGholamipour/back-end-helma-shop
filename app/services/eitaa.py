@@ -1,35 +1,27 @@
-import requests
-import logging
+# app/services/eitaa.py
+
 import os
+import logging
+import requests
 
-logger = logging.getLogger("eitaa")
+logger = logging.getLogger("services.eitaa")
 
-EITAA_TOKEN = "bot479619:aea2edc1-1a66-42a1-ba63-593f9139de2b"
+TOKEN = "bot479619:aea2edc1-1a66-42a1-ba63-593f9139de2b"
 CHAT_ID = "11198574"
 
-BASE_URL = f"https://eitaayar.ir/api/{EITAA_TOKEN}"
 
-
-def send_product(
-    image_path: str,
-    title: str,
-    caption: str,
-):
-    """
-    ارسال محصول به کانال ایتا
-    """
-
+def send_product(image_path: str, title: str, caption: str):
+    """ارسال محصول به ایتا"""
     try:
-
-        url = f"{BASE_URL}/sendFile"
-
+        if not os.path.exists(image_path):
+            logger.error(f"Eitaa image not found: {image_path}")
+            return
+        
+        url = f"https://eitaayar.ir/api/{TOKEN}/sendFile"
         with open(image_path, "rb") as image:
-
             response = requests.post(
                 url,
-                files={
-                    "file": image
-                },
+                files={"file": image},
                 data={
                     "chat_id": CHAT_ID,
                     "title": title,
@@ -37,18 +29,11 @@ def send_product(
                     "pin": True,
                 },
                 timeout=30,
-                verify=False,
+                verify=False
             )
 
         response.raise_for_status()
-
-        result = response.json()
-
-        if not result.get("ok"):
-            logger.error("Eitaa Error : %s", result)
-            return
-
-        logger.info("Product sent to eitaa successfully.")
+        logger.info("Product sent to Eitaa successfully.")
 
     except Exception:
-        logger.exception("Sending product to Eitaa failed")
+        logger.exception("Failed sending to Eitaa")
