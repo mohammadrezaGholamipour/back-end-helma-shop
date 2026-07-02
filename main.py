@@ -10,6 +10,7 @@ from fastapi import FastAPI
 import importlib
 import pkgutil
 import uvicorn
+import logging
 
 # /////////////////////////////////////////////////
 app = FastAPI(title="helma", description="API for helma shop", version="1.0.0",docs_url="/docs",
@@ -100,4 +101,13 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 # /////////////////////////////////////////////////
 
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[
+        logging.FileHandler("logs.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
 # uvicorn.run(app, host="0.0.0.0", port=8000)

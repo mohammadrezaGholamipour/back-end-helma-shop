@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query
 from app.core.security import get_current_user
+from app.services.eitaa import send_product
 from app.schemas.product import ProductOut
 from app.models.category import Category
 from app.models.product import Product
+from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import User
@@ -17,6 +19,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # ===================== CREATE PRODUCT =====================
 @router.post("/create", response_model=ProductOut)
 def create_product(
+    background_tasks: BackgroundTasks = None,
     name: str = Form(...),
     slug: str = Form(...), # اضافه شده برای سئو
     price: int = Form(...),
@@ -69,6 +72,25 @@ def create_product(
     db.add(product)
     db.commit()
     db.refresh(product)
+
+    if product.image:
+        caption = f"""
+📦 {product.name}
+
+💰 قیمت:
+{product.price:,} تومان
+
+⚖️ وزن:
+{product.volume} گرم
+"""
+
+        background_tasks.add_task(
+            send_product,
+            product.image.lstrip("/"),
+            product.name,
+            caption,
+        )
+
     return product
 
 # ===================== LIST (MY PRODUCTS) =====================
