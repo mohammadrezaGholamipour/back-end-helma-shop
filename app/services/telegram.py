@@ -1,13 +1,11 @@
-# app/services/telegram.py
-
-import os
-import logging
 import requests
+import logging
+import os
 
 logger = logging.getLogger("services.telegram")
 
-TOKEN = "8729934548:AAGuSUorsGRXrPayBu3dIstoRDyF1rMzBJE"
-CHAT_ID = "-1001673435498"
+TOKEN = "8914407408:AAHXGtmK_RJIFl2Mg8oZh6mCk94ZU4LevMA"
+CHAT_ID = "-1003966574296"
 
 PROXIES = {
     "http": "http://relay:8085",
@@ -31,7 +29,7 @@ def send_product(image_path: str, caption: str):
                 data={
                     "chat_id": CHAT_ID,
                     "caption": caption,
-                    "parse_mode": "HTML"  # در صورت تمایل به استفاده از تگ‌های HTML در کپشن
+                    "parse_mode": "HTML" 
                 },
                 proxies=PROXIES,
                 verify=False,
