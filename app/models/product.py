@@ -13,11 +13,14 @@ class Product(Base):
     slug = Column(String, unique=True, index=True, nullable=False)
 
     description = Column(String, nullable=True)
-    volume = Column(Integer, nullable=False)
-    price = Column(Integer, nullable=False)
     image = Column(String, nullable=True)
 
     meta_title = Column(String, nullable=True)
     meta_description = Column(String, nullable=True)
 
     category = relationship("Category", back_populates="products")
+    variants = relationship(
+        "ProductVariant",
+        back_populates="product",
+        cascade="all, delete-orphan"
+    )
