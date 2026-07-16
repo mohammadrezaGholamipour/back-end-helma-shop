@@ -82,39 +82,8 @@ def get_my_products(
         
     return query.all()
 
-# ===================== LIST (MY PRODUCTS) =====================
-@router.get("/me", response_model=list[ProductOut])
-def get_my_products(
-    application_id: str = Query(...),
-    search: str | None = None,
-    min_price: int | None = None,
-    max_price: int | None = None,
-    db: Session = Depends(get_db),
-):
-    query = (
-        db.query(Product)
-        .join(Category)
-        .filter(Category.application_id == application_id)
-    )
-
-    if search:
-        query = query.filter(Product.name.ilike(f"%{search}%"))
-
-    # فیلتر قیمت بر اساس وریانت‌ها
-    if min_price is not None or max_price is not None:
-        query = query.join(ProductVariant)
-
-        if min_price is not None:
-            query = query.filter(ProductVariant.price >= min_price)
-        if max_price is not None:
-            query = query.filter(ProductVariant.price <= max_price)
-
-        query = query.distinct()
-
-    return query.all()
 
 # ===================== GET PRODUCT BY SLUG =====================
-
 @router.get("/{slug}", response_model=ProductOut)
 def get_product_by_slug(
     slug: str,
@@ -123,7 +92,10 @@ def get_product_by_slug(
 ):
     product = (
         db.query(Product)
-        .options(joinedload(Product.variants))
+        .options(
+            joinedload(Product.variants),
+            joinedload(Product.category),
+        )
         .join(Category)
         .filter(
             Product.slug == slug,
@@ -139,6 +111,8 @@ def get_product_by_slug(
         )
 
     return product
+
+
 # ===================== UPDATE PRODUCT =====================
 @router.put("/update", response_model=ProductOut)
 def update_product(
