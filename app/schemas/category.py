@@ -6,7 +6,7 @@ class CreateAndUpdateCategory(BaseModel):
     name: str
     description: Optional[str] = None
     image: Optional[str] = None
-
+    display_order: int
     slug: str
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
@@ -14,6 +14,7 @@ class CreateAndUpdateCategory(BaseModel):
 
 class CategoryOut(BaseModel):
     id: int
+    display_order: int
     name: str
     description: Optional[str] = None
     image: Optional[str] = None

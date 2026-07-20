@@ -16,7 +16,7 @@ class Category(Base):
     image = Column(String, nullable=True)
     meta_title = Column(String, nullable=True)
     meta_description = Column(String, nullable=True)
-
+    display_order = Column(Integer, nullable=False)
     owner = relationship("User", back_populates="categories")
     products = relationship(
         "Product",

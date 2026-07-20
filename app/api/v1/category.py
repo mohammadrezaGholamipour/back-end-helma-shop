@@ -45,15 +45,19 @@ def create_category(
         with open(file_path, "wb") as buffer:
             buffer.write(image.file.read())
         image_url = f"/uploads/categories/{filename}"
+        
+        
+    last_order = db.query(func.max(Category.display_order)).scalar() or 0
 
     category = Category(
         application_id=current_user.application_id,
+        meta_description=meta_description,
+         display_order=last_order + 1,
         owner_id=current_user.id,
+        meta_title=meta_title,
         image=image_url,
         name=name,
         slug=slug,
-        meta_title=meta_title,
-        meta_description=meta_description
     )
 
     db.add(category)
@@ -142,6 +146,7 @@ def update_category(
     category_id: int = Form(...),
     name: str | None = Form(None),
     slug: str | None = Form(None),
+    display_order: int | None = Form(None),
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
     image: UploadFile = File(None),
