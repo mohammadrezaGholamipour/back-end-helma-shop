@@ -1,4 +1,14 @@
-from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query,status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    UploadFile,
+    File,
+    HTTPException,
+    Query,
+    status,
+)
+from app.enums.product import ProductType, ProductModel, OilType
 from app.schemas.product import ProductOut, ProductVariantOut
 from app.models.product_variant import ProductVariant
 from app.core.security import get_current_user
@@ -17,6 +27,7 @@ router = APIRouter(prefix="/helma-shop-api/v1/product", tags=["Product"])
 UPLOAD_DIR = "uploads/products"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 # ===================== CREATE PRODUCT =====================
 @router.post("/create", response_model=ProductOut)
 async def create_product(
@@ -26,8 +37,12 @@ async def create_product(
     description: str | None = Form(None),
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
+    product_type: ProductType | None = Form(None),
+    product_model: ProductModel | None = Form(None),
+    oil_type: OilType | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
+    is_packaged: bool | None = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     # چک کردن تکراری نبودن اسلاگ
@@ -43,6 +58,12 @@ async def create_product(
             buffer.write(image.file.read())
         image_url = f"/uploads/products/{filename}"
 
+    last_order = (
+        db.query(func.max(Product.display_order))
+        .filter(Product.category_id == category_id)
+        .scalar()
+    ) or 0
+
     product = Product(
         name=name,
         slug=slug,
@@ -50,7 +71,12 @@ async def create_product(
         description=description,
         meta_title=meta_title,
         meta_description=meta_description,
-        image=image_url
+        display_order=last_order + 1,
+        product_type=product_type,
+        product_model=product_model,
+        oil_type=oil_type,
+        is_packaged=is_packaged,
+        image=image_url,
     )
     db.add(product)
     db.commit()
@@ -67,11 +93,15 @@ def get_my_products(
     max_price: int | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(Product).join(Category).filter(Category.application_id == application_id)
-    
+    query = (
+        db.query(Product)
+        .join(Category)
+        .filter(Category.application_id == application_id)
+    )
+
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
-    
+
     if min_price is not None or max_price is not None:
         query = query.join(ProductVariant)
         if min_price is not None:
@@ -79,7 +109,7 @@ def get_my_products(
         if max_price is not None:
             query = query.filter(ProductVariant.price <= max_price)
         query = query.distinct()
-        
+
     return query.all()
 
 
@@ -122,11 +152,13 @@ def update_product(
     description: str | None = Form(None),
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
+    product_type: ProductType | None = Form(None),
+    product_model: ProductModel | None = Form(None),
+    oil_type: OilType | None = Form(None),
     category_id: int | None = Form(None),
-
-    variants_json: str | None = Form(None),  # اختیاری: اگر ارسال شد وریانت‌ها را جایگزین می‌کنیم
-
+    display_order: int | None = Form(None),
     image: UploadFile | None = File(None),
+    is_packaged: bool | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -140,18 +172,42 @@ def update_product(
         raise HTTPException(status_code=404, detail={"message": "محصول یافت نشد"})
 
     if category_id is not None:
-        new_cat = db.query(Category).filter(
-            Category.id == category_id,
-            Category.owner_id == current_user.id
-        ).first()
+        new_cat = (
+            db.query(Category)
+            .filter(Category.id == category_id, Category.owner_id == current_user.id)
+            .first()
+        )
         if not new_cat:
-            raise HTTPException(status_code=400, detail={"message": "دسته بندی نامعتبر"})
+            raise HTTPException(
+                status_code=400, detail={"message": "دسته بندی نامعتبر"}
+            )
         product.category_id = category_id
 
+    if display_order is not None:
+        product.display_order = display_order
+
+    if product_type is not None:
+        product.product_type = product_type
+
+    if product_model is not None:
+        product.product_model = product_model
+
+    if oil_type is not None:
+        product.oil_type = oil_type
+        
+    if is_packaged is not None:
+        product.is_packaged = is_packaged
+    
     if slug:
-        existing = db.query(Product).filter(Product.slug == slug, Product.id != product_id).first()
+        existing = (
+            db.query(Product)
+            .filter(Product.slug == slug, Product.id != product_id)
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=400, detail={"message": "این اسلاگ قبلاً ثبت شده است"})
+            raise HTTPException(
+                status_code=400, detail={"message": "این اسلاگ قبلاً ثبت شده است"}
+            )
         product.slug = slug
 
     if name is not None:
@@ -165,7 +221,9 @@ def update_product(
 
     if image:
         if not image.content_type or not image.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail={"message": "فایل باید تصویر باشد"})
+            raise HTTPException(
+                status_code=400, detail={"message": "فایل باید تصویر باشد"}
+            )
         ext = os.path.splitext(image.filename)[1]
         filename = f"{uuid.uuid4().hex}{ext}"
         file_path = os.path.join(UPLOAD_DIR, filename)
@@ -173,52 +231,26 @@ def update_product(
             buffer.write(image.file.read())
         product.image = f"/uploads/products/{filename}"
 
-    # اگر variants_json آمد: کل variants را replace کن
-    if variants_json is not None:
-        try:
-            variants_data = json.loads(variants_json)
-            if not isinstance(variants_data, list) or len(variants_data) == 0:
-                raise ValueError()
-        except Exception:
-            raise HTTPException(status_code=422, detail={"message": "variants_json نامعتبر است"})
-
-        # پاک کردن وریانت‌های قبلی (به خاطر delete-orphan)
-        product.variants.clear()
-
-        seen_volumes = set()
-        for v in variants_data:
-            vol = int(v.get("volume"))
-            price = int(v.get("price"))
-            stock = int(v.get("stock", 0))
-            if vol <= 0 or price < 0 or stock < 0:
-                raise HTTPException(status_code=422, detail={"message": "مقادیر volume/price/stock نامعتبر است"})
-            if vol in seen_volumes:
-                raise HTTPException(status_code=422, detail={"message": "volume تکراری در variants مجاز نیست"})
-            seen_volumes.add(vol)
-
-            product.variants.append(ProductVariant(
-                volume=vol,
-                price=price,
-                stock=stock,
-                image=v.get("image"),
-            ))
-
     db.commit()
     db.refresh(product)
     return product
 
+
 # ===================== Delete PRODUCT =====================
+
 
 @router.delete("/delete/{product_id}")
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    product = db.query(Product).join(Category).filter(
-        Product.id == product_id,
-        Category.owner_id == current_user.id
-    ).first()
+    product = (
+        db.query(Product)
+        .join(Category)
+        .filter(Product.id == product_id, Category.owner_id == current_user.id)
+        .first()
+    )
 
     if not product:
         raise HTTPException(status_code=404, detail={"message": "محصول یافت نشد"})
@@ -226,4 +258,3 @@ def delete_product(
     db.delete(product)
     db.commit()
     return {"message": "محصول با موفقیت حذف شد"}
-

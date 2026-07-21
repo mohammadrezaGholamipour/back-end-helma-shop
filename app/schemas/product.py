@@ -1,5 +1,7 @@
+from app.enums.product import ProductType, ProductModel, OilType
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
+
 
 class CategoryOut(BaseModel):
     id: int
@@ -29,6 +31,11 @@ class ProductOut(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
+    is_packaged: Optional[bool] = None
+    display_order: int
+    product_type: Optional[ProductType] = None
+    product_model: Optional[ProductModel] = None
+    oil_type: Optional[OilType] = None
     image: Optional[str] = None
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None

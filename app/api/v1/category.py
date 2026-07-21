@@ -145,7 +145,12 @@ def get_category_products(
 
     total = products_query.count()
 
-    products = products_query.offset((page - 1) * per_page).limit(per_page).all()
+    products = (
+        products_query.order_by(Product.display_order)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
 
     last_page = (total + per_page - 1) // per_page
 
@@ -181,8 +186,7 @@ def update_category(
 
     if name:
         category.name = name
-        
-        
+
     if display_order:
         category.display_order = display_order
 
