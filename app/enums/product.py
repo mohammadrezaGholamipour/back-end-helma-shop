@@ -12,6 +12,7 @@ class ProductModel(str, Enum):
     GOL = "گل"
     SEKKEI = "سکه‌ای"
     LOGHMEH = "لقمه ای"
+    MEDADI = "مدادی"
     COMBINATION = "ترکیبی از چند مدل"
     
 
