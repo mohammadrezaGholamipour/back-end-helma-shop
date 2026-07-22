@@ -85,12 +85,18 @@ async def create_product(
 
 
 # ===================== list PRODUCT =====================
-@router.get("/me", response_model=List[ProductOut])
+@router.get("/me", response_model=list[ProductOut])
 def get_my_products(
     application_id: str = Query(...),
-    search: str | None = None,
-    min_price: int | None = None,
-    max_price: int | None = None,
+    search: str | None = Query(None),
+
+    min_price: int | None = Query(None, ge=0),
+    max_price: int | None = Query(None, ge=0),
+
+    product_type: ProductType | None = Query(None),
+    product_model: ProductModel | None = Query(None),
+    oil_type: OilType | None = Query(None),
+
     db: Session = Depends(get_db),
 ):
     query = (
@@ -102,17 +108,27 @@ def get_my_products(
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
 
+    if product_type:
+        query = query.filter(Product.product_type == product_type)
+
+    if product_model:
+        query = query.filter(Product.product_model == product_model)
+
+    if oil_type:
+        query = query.filter(Product.oil_type == oil_type)
+
     if min_price is not None or max_price is not None:
         query = query.join(ProductVariant)
+
         if min_price is not None:
             query = query.filter(ProductVariant.price >= min_price)
+
         if max_price is not None:
             query = query.filter(ProductVariant.price <= max_price)
+
         query = query.distinct()
 
-    return query.all()
-
-
+    return query.order_by(Product.display_order).all()
 # ===================== GET PRODUCT BY SLUG =====================
 @router.get("/{slug}", response_model=ProductOut)
 def get_product_by_slug(
