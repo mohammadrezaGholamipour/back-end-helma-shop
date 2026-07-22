@@ -7,11 +7,11 @@ class ProductType(str, Enum):
 
 
 class ProductModel(str, Enum):
-    HOBEH = "حبه ای"
+    HOBEH = "حبه‌ای"
     BAGHLAVAEI = "باقلوایی"
     GOL = "گل"
     SEKKEI = "سکه‌ای"
-    LOGHMEH = "لقمه ای"
+    LOGHMEH = "لقمه‌ای"
     MEDADI = "مدادی"
     COMBINATION = "ترکیبی از چند مدل"
     
