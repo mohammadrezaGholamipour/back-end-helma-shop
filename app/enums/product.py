@@ -19,4 +19,4 @@ class ProductModel(str, Enum):
 class OilType(str, Enum):
     ANIMAL = "روغن حیوانی"
     VEGETABLE_BUTTER = "کره گیاهی"
-    VEGETABLE_OIL = "روغن گیاهی"    
+    NABATI_OIL = "روغن نباتی"    

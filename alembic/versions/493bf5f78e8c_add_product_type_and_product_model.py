@@ -19,6 +19,7 @@ product_model_enum = sa.Enum(
     "GOL",
     "SEKKEI",
     "LOGHMEH",
+    "MEDADI",
     "COMBINATION",
     name="productmodel",
 )
