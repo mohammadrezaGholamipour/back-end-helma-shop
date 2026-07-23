@@ -1,0 +1,40 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+
+            echo "📥 Updating backend..."
+            cd /root/app/backend
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "🐳 Building backend..."
+            cd /root/app
+            docker-compose build backend
+
+            echo "🚀 Restarting backend..."
+            docker-compose up -d backend
+
+            echo "🗄️ Running migrations..."
+            docker-compose exec -T backend alembic upgrade head
+
+            echo "🧹 Cleaning old images..."
+            docker image prune -f
+
+            echo "✅ Deploy finished"

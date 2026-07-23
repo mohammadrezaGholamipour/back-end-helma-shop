@@ -2,17 +2,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# کپی فایل requirements برای نصب پکیج‌ها
+# ابتدا فقط requirements را کپی کن تا لایه پکیج‌ها کش شود
 COPY requirements.txt .
-
-# ۱. ابتدا pip را آپدیت می‌کنیم
-# ۲. سپس با افزایش زمان انتظار (timeout) پکیج‌ها را نصب می‌کنیم
 RUN pip install --upgrade pip && \
-    pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
-# کپی کل سورس‌کد پروژه
+# سپس بقیه کد را کپی کن
 COPY . .
 
-# اجرا با uvicorn
+# به جای CMD معمولی، بهتر است از یک اسکریپت entrypoint استفاده کنی
+# تا مطمئن شوی دیتابیس قبل از بالا آمدن وب‌سرویس، مایگریت شده است.
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
