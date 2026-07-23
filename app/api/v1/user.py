@@ -5,15 +5,22 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 
-router = APIRouter(prefix="/helma-shop-api/v1/user", tags=["User"], dependencies=[Depends(get_current_user)])
+router = APIRouter(
+    prefix="/helma-shop-api/v1/user",
+    tags=["User"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # ===================== list =====================
 @router.get("/me", response_model=UserOut)
-def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    user = (
-        db.query(User)
-        .filter(User.id == current_user.id)
-        .first()
-    )
+def list_users(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    user = db.query(User).filter(User.id == current_user.id).first()
     return user
+
+
+@router.get("/tes", response_model=UserOut)
+def test():
+    return print("test")
