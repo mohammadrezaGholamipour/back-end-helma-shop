@@ -1,8 +1,6 @@
-from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from sqlalchemy import Integer, String
 from app.db.base import Base
-
 
 class BlogCategory(Base):
     __tablename__ = "blog_categories"
