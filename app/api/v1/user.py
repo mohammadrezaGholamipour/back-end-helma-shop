@@ -19,8 +19,3 @@ def list_users(
 ):
     user = db.query(User).filter(User.id == current_user.id).first()
     return user
-
-
-@router.get("/tes", response_model=UserOut)
-def test():
-    return print("test")
