@@ -217,7 +217,7 @@ async def create_blog(
     return blog
 
 
-@router.delete("/{blog_id}")
+@router.delete("delete/{blog_id}")
 def delete_blog(
     blog_id: int,
     db: Session = Depends(get_db),
@@ -243,7 +243,7 @@ def delete_blog(
     return {"message": "مقاله با موفقیت حذف شد."}
 
 
-@router.get("/website/list", response_model=BlogListOut)
+@router.get("/website/blog/list", response_model=BlogListOut)
 def get_website_blogs(
     page: int = Query(1, ge=1),
     per_page: int = Query(9, ge=1, le=100),
