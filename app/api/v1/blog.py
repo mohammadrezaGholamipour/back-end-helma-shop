@@ -217,7 +217,7 @@ async def create_blog(
     return blog
 
 
-@router.delete("delete/{blog_id}")
+@router.delete("/delete/{blog_id}")
 def delete_blog(
     blog_id: int,
     db: Session = Depends(get_db),
