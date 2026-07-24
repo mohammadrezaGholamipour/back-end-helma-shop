@@ -145,7 +145,7 @@ def get_blog_category(
     return category
 
 
-@router.get("/website/list", response_model=list[BlogCategoryOut])
+@router.get("/website/categories/list", response_model=list[BlogCategoryOut])
 def get_website_blog_categories(
     db: Session = Depends(get_db),
 ):
