@@ -11,8 +11,7 @@ from datetime import datetime
 from sqlalchemy import func
 import uuid
 import os
-
-router = APIRouter(prefix="/blog", tags=["Blog"])
+router = APIRouter(prefix="/helma-shop-api/v1/blog", tags=["Blog"])
 
 
 UPLOAD_DIR = "uploads/blogs"
