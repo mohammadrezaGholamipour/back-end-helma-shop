@@ -278,3 +278,52 @@ def get_blog_by_slug(
     db.refresh(blog)
 
     return blog
+
+@router.get("/website/list", response_model=BlogListOut)
+def get_website_blogs(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(9, ge=1, le=100),
+    search: str | None = Query(None),
+    category: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(Blog)
+        .join(BlogCategory)
+        .filter(Blog.status == BlogStatus.PUBLISHED)
+    )
+
+    # جستجو
+    if search:
+        query = query.filter(
+            Blog.title.ilike(f"%{search}%")
+        )
+
+    # فیلتر دسته‌بندی با slug
+    if category:
+        query = query.filter(
+            BlogCategory.slug == category
+        )
+
+    total = query.count()
+
+    blogs = (
+        query.order_by(
+            Blog.is_featured.desc(),
+            Blog.display_order.asc(),
+            Blog.published_at.desc(),
+        )
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    last_page = (total + per_page - 1) // per_page
+
+    return BlogListOut(
+        blogs=blogs,
+        total=total,
+        page=page,
+        per_page=per_page,
+        last_page=last_page,
+    )
