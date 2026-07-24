@@ -118,15 +118,6 @@ def delete_blog_category(
     return {"message": "دسته‌بندی با موفقیت حذف شد."}
 
 
-@router.get("/list", response_model=list[BlogCategoryOut])
-def get_blog_categories(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    categories = db.query(BlogCategory).order_by(BlogCategory.display_order.asc()).all()
-
-    return categories
-
 
 @router.get("/website/categories/list", response_model=list[BlogCategoryOut])
 def get_website_blog_categories(
