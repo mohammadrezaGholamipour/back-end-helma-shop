@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import func
 import uuid
 import os
+
 router = APIRouter(prefix="/helma-shop-api/v1/blog", tags=["Blog"])
 
 
@@ -18,7 +19,7 @@ UPLOAD_DIR = "uploads/blogs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.post("/create", response_model=BlogCategoryOut)
+@router.post("/create-category", response_model=BlogCategoryOut)
 def create_blog_category(
     name: str = Form(...),
     slug: str = Form(...),
@@ -153,7 +154,7 @@ def get_website_blog_categories(
     return categories
 
 
-@router.post("/create", response_model=BlogOut)
+@router.post("/create-blog", response_model=BlogOut)
 async def create_blog(
     title: str = Form(...),
     slug: str = Form(...),
@@ -191,6 +192,12 @@ async def create_blog(
     image_url = None
 
     if image:
+        if image.filename is None:
+            raise HTTPException(
+                status_code=400,
+                detail="نام فایل معتبر نیست.",
+            )
+
         ext = os.path.splitext(image.filename)[1]
         filename = f"{uuid.uuid4().hex}{ext}"
 
