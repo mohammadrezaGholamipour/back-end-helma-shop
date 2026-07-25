@@ -118,7 +118,6 @@ def delete_blog_category(
     return {"message": "دسته‌بندی با موفقیت حذف شد."}
 
 
-
 @router.get("/website/categories/list", response_model=list[BlogCategoryOut])
 def get_website_blog_categories(
     db: Session = Depends(get_db),
@@ -211,6 +210,103 @@ async def create_blog(
     )
 
     db.add(blog)
+    db.commit()
+    db.refresh(blog)
+
+    return blog
+
+
+@router.put("/update/{blog_id}", response_model=BlogOut)
+async def update_blog(
+    blog_id: int,
+    title: str = Form(...),
+    slug: str = Form(...),
+    category_id: int = Form(...),
+    content: str = Form(...),
+    summary: str | None = Form(None),
+    status: BlogStatus = Form(BlogStatus.DRAFT),
+    display_order: int | None = Form(None),
+    reading_time: int | None = Form(None),
+    is_featured: bool = Form(False),
+    meta_title: str | None = Form(None),
+    meta_description: str | None = Form(None),
+    published_at: datetime | None = Form(None),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    blog = db.query(Blog).filter(Blog.id == blog_id).first()
+
+    if not blog:
+        raise HTTPException(
+            status_code=404,
+            detail="مقاله یافت نشد.",
+        )
+
+    # بررسی تکراری نبودن اسلاگ
+    slug_exists = (
+        db.query(Blog)
+        .filter(
+            Blog.slug == slug,
+            Blog.id != blog_id,
+        )
+        .first()
+    )
+
+    if slug_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="این اسلاگ قبلاً ثبت شده است",
+        )
+
+    # بررسی وجود دسته‌بندی
+    category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
+
+    if not category:
+        raise HTTPException(
+            status_code=404,
+            detail="دسته‌بندی یافت نشد.",
+        )
+
+    # آپلود تصویر جدید
+    if image:
+        if image.filename is None:
+            raise HTTPException(
+                status_code=400,
+                detail="نام فایل معتبر نیست.",
+            )
+
+        # حذف تصویر قبلی
+        if blog.image:
+            old_image = blog.image.lstrip("/")
+            if os.path.exists(old_image):
+                os.remove(old_image)
+
+        ext = os.path.splitext(image.filename)[1]
+        filename = f"{uuid.uuid4().hex}{ext}"
+
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        with open(file_path, "wb") as buffer:
+            buffer.write(await image.read())
+
+        blog.image = f"/uploads/blogs/{filename}"
+
+    blog.title = title
+    blog.slug = slug
+    blog.category_id = category_id
+    blog.summary = summary
+    blog.content = content
+    blog.status = status
+    blog.reading_time = reading_time
+    blog.is_featured = is_featured
+    blog.meta_title = meta_title
+    blog.meta_description = meta_description
+    blog.published_at = published_at
+
+    if display_order is not None:
+        blog.display_order = display_order
+
     db.commit()
     db.refresh(blog)
 
