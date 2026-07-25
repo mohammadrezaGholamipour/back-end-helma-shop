@@ -221,13 +221,13 @@ async def update_blog(
     blog_id: int,
     title: str | None = Form(None),
     slug: str | None = Form(None),
-    category_id: int = Form(...),
+    category_id: int | None = Form(None),
     content: str | None = Form(None),
     summary: str | None = Form(None),
-    status: BlogStatus = Form(BlogStatus.DRAFT),
+    status: BlogStatus | None = Form(None),
     display_order: int | None = Form(None),
     reading_time: int | None = Form(None),
-    is_featured: bool = Form(False),
+    is_featured: bool | None = Form(None),
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
     published_at: datetime | None = Form(None),
@@ -243,30 +243,38 @@ async def update_blog(
             detail="مقاله یافت نشد.",
         )
 
-    # بررسی تکراری نبودن اسلاگ
-    slug_exists = (
-        db.query(Blog)
-        .filter(
-            Blog.slug == slug,
-            Blog.id != blog_id,
-        )
-        .first()
-    )
-
-    if slug_exists:
-        raise HTTPException(
-            status_code=400,
-            detail="این اسلاگ قبلاً ثبت شده است",
+    # بررسی اسلاگ فقط در صورتی که ارسال شده باشد
+    if slug is not None:
+        slug_exists = (
+            db.query(Blog)
+            .filter(
+                Blog.slug == slug,
+                Blog.id != blog_id,
+            )
+            .first()
         )
 
-    # بررسی وجود دسته‌بندی
-    category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
+        if slug_exists:
+            raise HTTPException(
+                status_code=400,
+                detail="این اسلاگ قبلاً ثبت شده است",
+            )
 
-    if not category:
-        raise HTTPException(
-            status_code=404,
-            detail="دسته‌بندی یافت نشد.",
+    # بررسی دسته‌بندی فقط در صورتی که ارسال شده باشد
+    if category_id is not None:
+        category = (
+            db.query(BlogCategory)
+            .filter(BlogCategory.id == category_id)
+            .first()
         )
+
+        if not category:
+            raise HTTPException(
+                status_code=404,
+                detail="دسته‌بندی یافت نشد.",
+            )
+
+        blog.category_id = category_id
 
     # آپلود تصویر جدید
     if image:
@@ -276,7 +284,6 @@ async def update_blog(
                 detail="نام فایل معتبر نیست.",
             )
 
-        # حذف تصویر قبلی
         if blog.image:
             old_image = blog.image.lstrip("/")
             if os.path.exists(old_image):
@@ -292,20 +299,39 @@ async def update_blog(
 
         blog.image = f"/uploads/blogs/{filename}"
 
-    blog.title = title
-    blog.slug = slug
-    blog.category_id = category_id
-    blog.summary = summary
-    blog.content = content
-    blog.status = status
-    blog.reading_time = reading_time
-    blog.is_featured = is_featured
-    blog.meta_title = meta_title
-    blog.meta_description = meta_description
-    blog.published_at = published_at
+    # فقط فیلدهای ارسال‌شده بروزرسانی شوند
+    if title is not None:
+        blog.title = title
+
+    if slug is not None:
+        blog.slug = slug
+
+    if content is not None:
+        blog.content = content
+
+    if summary is not None:
+        blog.summary = summary
+
+    if status is not None:
+        blog.status = status
 
     if display_order is not None:
         blog.display_order = display_order
+
+    if reading_time is not None:
+        blog.reading_time = reading_time
+
+    if is_featured is not None:
+        blog.is_featured = is_featured
+
+    if meta_title is not None:
+        blog.meta_title = meta_title
+
+    if meta_description is not None:
+        blog.meta_description = meta_description
+
+    if published_at is not None:
+        blog.published_at = published_at
 
     db.commit()
     db.refresh(blog)
