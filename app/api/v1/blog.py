@@ -219,10 +219,10 @@ async def create_blog(
 @router.put("/update/{blog_id}", response_model=BlogOut)
 async def update_blog(
     blog_id: int,
-    title: str = Form(...),
-    slug: str = Form(...),
+    title: str | None = Form(None),
+    slug: str | None = Form(None),
     category_id: int = Form(...),
-    content: str = Form(...),
+    content: str | None = Form(None),
     summary: str | None = Form(None),
     status: BlogStatus = Form(BlogStatus.DRAFT),
     display_order: int | None = Form(None),
