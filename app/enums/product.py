@@ -2,21 +2,21 @@ from enum import Enum
 
 
 class ProductType(str, Enum):
-    SOHAN = "سوهان"
-    GAZ = "گز"
+    SOHAN = "SOHAN"
+    GAZ = "GAZ"
 
 
 class ProductModel(str, Enum):
-    HOBEH = "حبه‌ای"
-    BAGHLAVAEI = "باقلوایی"
-    GOL = "گل"
-    SEKKEI = "سکه‌ای"
-    LOGHMEH = "لقمه‌ای"
-    MEDADI = "مدادی"
-    COMBINATION = "ترکیبی از چند مدل"
+    HOBEH = "HOBEH"
+    BAGHLAVAEI = "BAGHLAVAEI"
+    GOL = "GOL"
+    SEKKEI = "SEKKEI"
+    LOGHMEH = "LOGHMEH"
+    MEDADI = "MEDADI"
+    COMBINATION = "COMBINATION"
     
 
 class OilType(str, Enum):
-    ANIMAL = "روغن حیوانی"
-    VEGETABLE_BUTTER = "کره گیاهی"
-    NABATI_OIL = "روغن نباتی"    
+    ANIMAL_OIL = "ANIMAL_OIL"
+    VEGETABLE_BUTTER = "VEGETABLE_BUTTER"
+    NABATI_OIL = "NABATI_OIL"    
