@@ -48,3 +48,8 @@ class CategoryProductsResponse(BaseModel):
     page: int
     per_page: int
     last_page: int
+
+
+class CategoryOrderItem(BaseModel):
+    id: int
+    display_order: int

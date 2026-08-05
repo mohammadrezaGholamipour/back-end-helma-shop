@@ -221,3 +221,40 @@ def update_category(
     db.commit()
     db.refresh(category)
     return category
+
+
+from app.schemas.category import CategoryOrderItem
+
+
+# ===================== update display order =====================
+@router.put("/display-order")
+def update_category_display_order(
+    items: list[CategoryOrderItem],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ids = [item.id for item in items]
+
+    categories = (
+        db.query(Category)
+        .filter(
+            Category.id.in_(ids),
+            Category.owner_id == current_user.id,
+        )
+        .all()
+    )
+
+    if len(categories) != len(ids):
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "برخی دسته‌بندی‌ها یافت نشدند"},
+        )
+
+    category_map = {category.id: category for category in categories}
+
+    for item in items:
+        category_map[item.id].display_order = item.display_order
+
+    db.commit()
+
+    return {"message": "ترتیب دسته‌بندی‌ها با موفقیت بروزرسانی شد"}
