@@ -54,7 +54,7 @@ def update_blog_category(
     category_id: int,
     name: str = Form(...),
     slug: str = Form(...),
-    display_order: int = Form(...),
+    display_order: int | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
