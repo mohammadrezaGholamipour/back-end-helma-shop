@@ -18,6 +18,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import User
+from sqlalchemy import func
 from typing import List
 import uuid
 import os

@@ -8,17 +8,18 @@ from fastapi import (
     BackgroundTasks,
     status,
 )
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.core.security import get_current_user
-from app.models import User
-from app.models.product import Product
+from app.services.social_manager import notify_new_product
 from app.models.product_variant import ProductVariant
 from app.schemas.product import ProductVariantOut
-from app.services.social_manager import notify_new_product
-
+from app.core.security import get_current_user
+from app.models.product import Product
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from sqlalchemy import func
+from app.models import User
 import uuid
 import os
+
 
 router = APIRouter(
     prefix="/helma-shop-api/v1/variant",
