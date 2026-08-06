@@ -371,9 +371,7 @@ def get_website_blogs(
     category: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = (
-        db.query(Blog).join(BlogCategory).filter(Blog.status == BlogStatus.PUBLISHED)
-    )
+    query = db.query(Blog).join(BlogCategory)
 
     # جستجو
     if search:
@@ -412,14 +410,7 @@ def get_blog_by_slug(
     slug: str,
     db: Session = Depends(get_db),
 ):
-    blog = (
-        db.query(Blog)
-        .filter(
-            Blog.slug == slug,
-            Blog.status == BlogStatus.PUBLISHED,
-        )
-        .first()
-    )
+    blog = db.query(Blog).filter(Blog.slug == slug).first()
 
     if not blog:
         raise HTTPException(
