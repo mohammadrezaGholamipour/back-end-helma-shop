@@ -84,7 +84,9 @@ def update_blog_category(
 
     category.name = name
     category.slug = slug
-    category.display_order = display_order
+
+    if display_order:
+        category.display_order = display_order
 
     db.commit()
     db.refresh(category)
@@ -262,11 +264,7 @@ async def update_blog(
 
     # بررسی دسته‌بندی فقط در صورتی که ارسال شده باشد
     if category_id is not None:
-        category = (
-            db.query(BlogCategory)
-            .filter(BlogCategory.id == category_id)
-            .first()
-        )
+        category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
 
         if not category:
             raise HTTPException(
