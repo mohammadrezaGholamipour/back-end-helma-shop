@@ -8,7 +8,6 @@ class Store(Base):
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     owner = relationship("User", back_populates="store")
     id = Column(Integer, primary_key=True, index=True)
-    application_id = Column(Integer, nullable=False)
     instagram = Column(String, nullable=True)
     telegram = Column(String, nullable=True)
     whatsapp = Column(String, nullable=True)

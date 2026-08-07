@@ -1,159 +1,218 @@
-from fastapi import APIRouter, Depends, Form, UploadFile, File, HTTPException, Query
-from app.schemas.category import CategoryOut, CreateAndUpdateCategory
-from app.core.security import get_current_user
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    UploadFile,
+    File,
+    HTTPException,
+    Query,
+)
+
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
+from app.db.session import get_db
 from app.models.category import Category
 from app.models.product import Product
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from sqlalchemy import func
-from app.models import User
+from app.models.user import User
+
+from app.schemas.category import (
+    CategoryOut,
+    CategoryOrderItem,
+)
+
+from app.core.security import get_current_user
+
 import uuid
 import os
 
-router = APIRouter(prefix="/helma-shop-api/v1/category", tags=["Category"])
+router = APIRouter(
+    prefix="/helma-shop-api/v1/category",
+    tags=["Category"],
+)
+
 
 UPLOAD_DIR = "uploads/categories"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-# ===================== create =====================
-@router.post("/create", response_model=CategoryOut)
+# =====================================================
+# CREATE CATEGORY
+# =====================================================
+
+
+@router.post(
+    "/create",
+    response_model=CategoryOut,
+)
 def create_category(
     name: str = Form(...),
-    slug: str = Form(...),  # اضافه شد برای سئو
-    meta_title: str | None = Form(None),  # اضافه شد
-    meta_description: str | None = Form(None),  # اضافه شد
-    image: UploadFile = File(None),
+    slug: str = Form(...),
+    meta_title: str | None = Form(None),
+    meta_description: str | None = Form(None),
+    image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # بررسی تکراری نبودن نام
-    if db.query(Category).filter(Category.name == name).first():
+
+    exists_name = (
+        db.query(Category)
+        .filter(
+            Category.name == name,
+            Category.owner_id == current_user.id,
+        )
+        .first()
+    )
+
+    if exists_name:
         raise HTTPException(
             status_code=400,
-            detail={"field": "name", "message": "این نام قبلاً ثبت شده است"},
+            detail={
+                "field": "name",
+                "message": "این نام قبلاً ثبت شده است",
+            },
         )
 
-    # بررسی تکراری نبودن اسلاگ (حیاتی برای سئو)
-    if db.query(Category).filter(Category.slug == slug).first():
+    exists_slug = db.query(Category).filter(Category.slug == slug).first()
+
+    if exists_slug:
         raise HTTPException(
             status_code=400,
             detail={
                 "field": "slug",
-                "message": "این اسلاگ (URL) قبلاً استفاده شده است",
+                "message": "این اسلاگ قبلاً استفاده شده است",
             },
         )
 
     image_url = None
+
     if image:
+
         if not image.content_type.startswith("image/"):
             raise HTTPException(
-                status_code=400, detail={"message": "فایل باید تصویر باشد"}
+                status_code=400,
+                detail={"message": "فایل باید تصویر باشد"},
             )
 
         ext = os.path.splitext(image.filename)[1]
-        filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
 
-        with open(file_path, "wb") as buffer:
+        filename = f"{uuid.uuid4().hex}{ext}"
+
+        path = os.path.join(UPLOAD_DIR, filename)
+
+        with open(path, "wb") as buffer:
             buffer.write(image.file.read())
+
         image_url = f"/uploads/categories/{filename}"
 
-    last_order = db.query(func.max(Category.display_order)).scalar() or 0
+    last_order = (
+        db.query(func.max(Category.display_order))
+        .filter(Category.owner_id == current_user.id)
+        .scalar()
+        or 0
+    )
 
     category = Category(
-        application_id=current_user.application_id,
-        meta_description=meta_description,
-        display_order=last_order + 1,
         owner_id=current_user.id,
-        meta_title=meta_title,
-        image=image_url,
         name=name,
         slug=slug,
+        image=image_url,
+        meta_title=meta_title,
+        meta_description=meta_description,
+        display_order=last_order + 1,
     )
 
     db.add(category)
     db.commit()
     db.refresh(category)
+
     return category
 
 
-# ===================== list me =====================
-@router.get("/me", response_model=list[CategoryOut])
-def get_categories(
-    application_id: int | None = None,  # معمولا آیدی ها int هستند
+# =====================================================
+# GET MY CATEGORIES
+# =====================================================
+
+
+@router.get(
+    "/me",
+    response_model=list[CategoryOut],
+)
+def get_my_categories(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    if not application_id:
-        raise HTTPException(
-            status_code=400, detail={"message": "شناسه اپلیکیشن الزامی است"}
-        )
 
     return (
         db.query(Category)
-        .filter(Category.application_id == application_id)
+        .filter(Category.owner_id == current_user.id)
         .order_by(Category.display_order.asc())
         .all()
     )
 
 
-# ===================== delete =====================
+# =====================================================
+# DELETE CATEGORY
+# =====================================================
+
+
 @router.delete("/delete/{category_id}")
 def delete_category(
     category_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    category = db.query(Category).filter(Category.id == category_id).first()
+
+    category = (
+        db.query(Category)
+        .filter(
+            Category.id == category_id,
+            Category.owner_id == current_user.id,
+        )
+        .first()
+    )
 
     if not category:
-        raise HTTPException(status_code=404, detail={"message": "یافت نشد"})
-
-    if category.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail={"message": "عدم دسترسی"})
+        raise HTTPException(status_code=404, detail={"message": "دسته بندی یافت نشد"})
 
     db.delete(category)
     db.commit()
-    return {"message": "دسته بندی و تمام محصولات زیرمجموعه حذف شدند"}
+
+    return {"message": "دسته بندی و محصولات آن حذف شدند"}
 
 
-# ===================== get category products =====================
+# =====================================================
+# GET CATEGORY PRODUCTS
+# =====================================================
+
+
 @router.get("/{slug}")
 def get_category_products(
     slug: str,
-    application_id: int | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(12, ge=1, le=100),
     search: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    category_query = db.query(Category).filter(Category.slug == slug)
 
-    if application_id:
-        category_query = category_query.filter(
-            Category.application_id == application_id
-        )
-
-    category = category_query.first()
+    category = db.query(Category).filter(Category.slug == slug).first()
 
     if not category:
-        raise HTTPException(status_code=404, detail={"message": "دسته‌بندی یافت نشد"})
+        raise HTTPException(status_code=404, detail={"message": "دسته بندی یافت نشد"})
 
-    products_query = db.query(Product).filter(Product.category_id == category.id)
+    query = db.query(Product).filter(Product.category_id == category.id)
 
     if search:
-        products_query = products_query.filter(Product.name.ilike(f"%{search}%"))
+        query = query.filter(Product.name.ilike(f"%{search}%"))
 
-    total = products_query.count()
+    total = query.count()
 
     products = (
-        products_query.order_by(Product.display_order)
+        query.order_by(Product.display_order)
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
     )
-
-    last_page = (total + per_page - 1) // per_page
 
     return {
         "category": category,
@@ -161,11 +220,15 @@ def get_category_products(
         "total": total,
         "page": page,
         "per_page": per_page,
-        "last_page": last_page,
+        "last_page": (total + per_page - 1) // per_page,
     }
 
 
-# ===================== update =====================
+# =====================================================
+# UPDATE CATEGORY
+# =====================================================
+
+
 @router.put("/update", response_model=CategoryOut)
 def update_category(
     category_id: int = Form(...),
@@ -174,66 +237,86 @@ def update_category(
     display_order: int | None = Form(None),
     meta_title: str | None = Form(None),
     meta_description: str | None = Form(None),
-    image: UploadFile = File(None),
+    image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    category = db.query(Category).filter(Category.id == category_id).first()
+
+    category = (
+        db.query(Category)
+        .filter(
+            Category.id == category_id,
+            Category.owner_id == current_user.id,
+        )
+        .first()
+    )
+
     if not category:
-        raise HTTPException(status_code=404, detail={"message": "یافت نشد"})
+        raise HTTPException(status_code=404, detail={"message": "دسته بندی یافت نشد"})
 
-    if category.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail={"message": "عدم دسترسی"})
-
-    if name:
+    if name is not None:
         category.name = name
 
-    if display_order:
-        category.display_order = display_order
+    if slug is not None:
 
-    if slug:
-        # چک کردن اینکه اسلاگ جدید با اسلاگ دیگران تداخل نداشته باشد
-        existing = (
+        exists = (
             db.query(Category)
-            .filter(Category.slug == slug, Category.id != category_id)
+            .filter(
+                Category.slug == slug,
+                Category.id != category_id,
+            )
             .first()
         )
-        if existing:
+
+        if exists:
             raise HTTPException(
-                status_code=400,
-                detail={"message": "این اسلاگ قبلاً توسط دسته دیگری رزرو شده است"},
+                status_code=400, detail={"message": "این اسلاگ قبلاً استفاده شده"}
             )
+
         category.slug = slug
 
-    if meta_title:
+    if display_order is not None:
+        category.display_order = display_order
+
+    if meta_title is not None:
         category.meta_title = meta_title
-    if meta_description:
+
+    if meta_description is not None:
         category.meta_description = meta_description
 
     if image:
+
         ext = os.path.splitext(image.filename)[1]
+
         filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        with open(file_path, "wb") as buffer:
+
+        path = os.path.join(UPLOAD_DIR, filename)
+
+        with open(path, "wb") as buffer:
             buffer.write(image.file.read())
+
         category.image = f"/uploads/categories/{filename}"
 
     db.commit()
     db.refresh(category)
+
     return category
 
 
-from app.schemas.category import CategoryOrderItem
+# =====================================================
+# UPDATE DISPLAY ORDER
+# =====================================================
 
 
-# ===================== update display order =====================
 @router.put("/display-order")
 def update_category_display_order(
     items: list[CategoryOrderItem],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+
     ids = [item.id for item in items]
+
 
     categories = (
         db.query(Category)
@@ -244,17 +327,29 @@ def update_category_display_order(
         .all()
     )
 
+
     if len(categories) != len(ids):
         raise HTTPException(
             status_code=404,
-            detail={"message": "برخی دسته‌بندی‌ها یافت نشدند"},
+            detail={
+                "message": "برخی دسته بندی‌ها یافت نشدند"
+            }
         )
 
-    category_map = {category.id: category for category in categories}
+
+    category_map = {
+        category.id: category
+        for category in categories
+    }
+
 
     for item in items:
         category_map[item.id].display_order = item.display_order
 
+
     db.commit()
 
-    return {"message": "ترتیب دسته‌بندی‌ها با موفقیت بروزرسانی شد"}
+
+    return {
+        "message": "ترتیب دسته بندی‌ها با موفقیت بروزرسانی شد"
+    }

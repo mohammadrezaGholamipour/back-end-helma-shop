@@ -1,55 +1,105 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
+from typing import List, Optional
 
+from pydantic import BaseModel, ConfigDict
+
+
+# =====================================================
+# CREATE / UPDATE
+# =====================================================
 
 class CreateAndUpdateCategory(BaseModel):
     name: str
-    description: Optional[str] = None
-    image: Optional[str] = None
-    display_order: int
+
     slug: str
+
+    image: Optional[str] = None
+
+    display_order: Optional[int] = None
+
     meta_title: Optional[str] = None
+
     meta_description: Optional[str] = None
 
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+# =====================================================
+# CATEGORY OUTPUT
+# =====================================================
 
 class CategoryOut(BaseModel):
     id: int
-    display_order: int
-    name: str
-    description: Optional[str] = None
-    image: Optional[str] = None
-    application_id: Optional[int] = None
 
-    slug: Optional[str] = None
+    name: str
+
+    slug: str
+
+    image: Optional[str] = None
+
+    display_order: int
+
     meta_title: Optional[str] = None
+
     meta_description: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
+
+# =====================================================
+# PRODUCTS INSIDE CATEGORY
+# =====================================================
 
 class ProductInCategory(BaseModel):
     id: int
+
     name: str
-    description: Optional[str] = None
-    price: Optional[float] = None
+
+    slug: str
+
     image: Optional[str] = None
 
-    slug: Optional[str] = None
+    description: Optional[str] = None
+
     meta_title: Optional[str] = None
+
     meta_description: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
+
+# =====================================================
+# CATEGORY PRODUCTS PAGINATION
+# =====================================================
 
 class CategoryProductsResponse(BaseModel):
     category: CategoryOut
+
     products: List[ProductInCategory]
+
     total: int
+
     page: int
+
     per_page: int
+
     last_page: int
 
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+# =====================================================
+# DRAG & DROP ORDER
+# =====================================================
 
 class CategoryOrderItem(BaseModel):
     id: int
+
     display_order: int
