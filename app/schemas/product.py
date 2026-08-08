@@ -1,5 +1,5 @@
 from typing import List, Optional
-
+from app.schemas.category import CategoryOut
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.enums.product import (
@@ -75,7 +75,7 @@ class ProductOut(BaseModel):
 
 
     # روابط
-    category: Optional["CategoryOut"] = None
+    category: Optional[CategoryOut] = None
 
     variants: List[ProductVariantOut] = Field(
         default_factory=list
