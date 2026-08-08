@@ -1,0 +1,44 @@
+from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
+from app.db.base import Base
+
+
+class CustomerProfile(Base):
+    __tablename__ = "customer_profiles"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    first_name = Column(
+        String,
+        nullable=False,
+    )
+
+    last_name = Column(
+        String,
+        nullable=False,
+    )
+
+    email = Column(
+        String,
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    user = relationship(
+        "User",
+        back_populates="customer_profile",
+    )
