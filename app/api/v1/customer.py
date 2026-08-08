@@ -10,10 +10,17 @@ router = APIRouter(
     prefix="/helma-shop-api/v1/customer",
     tags=["Customer"],
 )
+
+
 # =====================
 # GET MY PROFILE
 # =====================
-@router.get("/profile", response_model=CustomerProfileOut)
+
+
+@router.get(
+    "/profile",
+    response_model=CustomerProfileOut,
+)
 def get_my_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -25,13 +32,13 @@ def get_my_profile(
     )
 
     if not profile:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "field": "profile",
-                "message": "اطلاعات کاربری یافت نشد",
-            },
+        profile = CustomerProfile(
+            user_id=current_user.id,
         )
+
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
 
     return profile
 
@@ -41,7 +48,10 @@ def get_my_profile(
 # =====================
 
 
-@router.put("/profile", response_model=CustomerProfileOut)
+@router.put(
+    "/profile",
+    response_model=CustomerProfileOut,
+)
 def update_my_profile(
     data: CustomerProfileUpdate,
     db: Session = Depends(get_db),
