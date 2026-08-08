@@ -3,8 +3,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.schemas.user import UserCreate, UserOut, TokenResponse
 
 from fastapi import APIRouter, Depends, HTTPException, status
-
-from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from app.models.user import User, UserRole
 
 from sqlalchemy.orm import Session
