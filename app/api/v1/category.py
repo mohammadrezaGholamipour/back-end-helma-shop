@@ -140,15 +140,9 @@ def create_category(
 )
 def get_my_categories(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
 
-    return (
-        db.query(Category)
-        .filter(Category.owner_id == current_user.id)
-        .order_by(Category.display_order.asc())
-        .all()
-    )
+    return db.query(Category).order_by(Category.display_order.asc()).all()
 
 
 # =====================================================
@@ -317,7 +311,6 @@ def update_category_display_order(
 
     ids = [item.id for item in items]
 
-
     categories = (
         db.query(Category)
         .filter(
@@ -327,29 +320,16 @@ def update_category_display_order(
         .all()
     )
 
-
     if len(categories) != len(ids):
         raise HTTPException(
-            status_code=404,
-            detail={
-                "message": "برخی دسته بندی‌ها یافت نشدند"
-            }
+            status_code=404, detail={"message": "برخی دسته بندی‌ها یافت نشدند"}
         )
 
-
-    category_map = {
-        category.id: category
-        for category in categories
-    }
-
+    category_map = {category.id: category for category in categories}
 
     for item in items:
         category_map[item.id].display_order = item.display_order
 
-
     db.commit()
 
-
-    return {
-        "message": "ترتیب دسته بندی‌ها با موفقیت بروزرسانی شد"
-    }
+    return {"message": "ترتیب دسته بندی‌ها با موفقیت بروزرسانی شد"}
