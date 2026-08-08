@@ -62,24 +62,7 @@ def register(
         )
 
 
-    existing_username = (
-        db.query(User)
-        .filter(User.username == user.username)
-        .first()
-    )
-
-    if existing_username:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "field": "username",
-                "message": "این نام کاربری قبلاً ثبت شده است"
-            }
-        )
-
-
     new_user = User(
-        username=user.username,
         mobile=user.mobile,
         password_hash=hash_password(user.password),
 
@@ -115,7 +98,7 @@ def login(
     user = (
         db.query(User)
         .filter(
-            User.username == form_data.username
+            User.mobile == form_data.mobile
         )
         .first()
     )
@@ -125,8 +108,8 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "field": "username or password",
-                "message": "نام کاربری یا رمز عبور اشتباه است"
+                "field": "mobile or password",
+                "message": "شماره موبایل یا رمز عبور اشتباه است"
             }
         )
 
@@ -138,8 +121,8 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "field": "username or password",
-                "message": "نام کاربری یا رمز عبور اشتباه است"
+                "field": "mobile or password",
+                "message": "شماره موبایل یا رمز عبور اشتباه است"
             }
         )
 

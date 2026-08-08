@@ -10,13 +10,9 @@ router = APIRouter(
     prefix="/helma-shop-api/v1/customer",
     tags=["Customer"],
 )
-
-
 # =====================
 # GET MY PROFILE
 # =====================
-
-
 @router.get("/profile", response_model=CustomerProfileOut)
 def get_my_profile(
     db: Session = Depends(get_db),

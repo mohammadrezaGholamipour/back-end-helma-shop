@@ -19,27 +19,9 @@ from app.models.user import UserRole
 class UserCreate(BaseModel):
     mobile: str
 
-    username: str
-
     password: str
 
     repeat_password: str
-
-
-    @field_validator("username")
-    @classmethod
-    def username_length(cls, v: str) -> str:
-
-        v = v.strip()
-
-        if len(v) < 3:
-            raise PydanticCustomError(
-                "username",
-                "نام کاربری حداقل باید ۳ حرف باشد",
-            )
-
-        return v
-
 
     @field_validator("mobile")
     @classmethod
@@ -121,8 +103,6 @@ class UserOut(BaseModel):
     id: int
 
     mobile: str
-
-    username: str
 
     role: UserRole
 

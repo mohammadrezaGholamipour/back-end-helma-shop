@@ -3,16 +3,19 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
+from pydantic import BaseModel, ConfigDict, EmailStr
+
+
 class CustomerProfileBase(BaseModel):
-    first_name: str
-    last_name: str
-    email: Optional[EmailStr] = None
+    first_name: str | None = None
+    last_name: str | None = None
+    email: EmailStr | None = None
 
 
 class CustomerProfileUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    first_name: str | None = None
+    last_name: str | None = None
+    email: EmailStr | None = None
 
 
 class CustomerProfileOut(CustomerProfileBase):

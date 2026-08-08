@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
 
 from app.core.security import get_current_user
-from app.models.user import User
+from fastapi import APIRouter, Depends
 from app.schemas.user import UserOut
+from app.models.user import User
 
 router = APIRouter(
     prefix="/helma-shop-api/v1/user",

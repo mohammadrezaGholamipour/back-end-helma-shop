@@ -25,13 +25,6 @@ class User(Base):
         index=True,
     )
 
-    username = Column(
-        String,
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-
     password_hash = Column(
         String,
         nullable=False,
