@@ -7,8 +7,8 @@ from app.db.session import get_db
 from app.models.user import User
 
 router = APIRouter(
-    prefix="/helma-shop-api/v1/customer/orders",
-    tags=["Customer Orders"],
+    prefix="/helma-shop-api/v1/order",
+    tags=["Order"],
 )
 
 
