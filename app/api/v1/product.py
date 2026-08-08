@@ -143,12 +143,9 @@ def get_my_products(
     product_model: ProductModel | None = Query(None),
     oil_type: OilType | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
 
-    query = (
-        db.query(Product).join(Category).filter(Category.owner_id == current_user.id)
-    )
+    query = db.query(Product).join(Category)
 
     if search:
 
