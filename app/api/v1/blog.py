@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, Query
 from app.schemas.blog import BlogOut, BlogListOut, BlogCategoryOut
 from app.models.blog_category import BlogCategory
-from app.core.security import get_current_user
+from app.core.security import get_current_admin
 from app.enums.blog import BlogStatus
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -24,7 +24,7 @@ def create_blog_category(
     name: str = Form(...),
     slug: str = Form(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     if db.query(BlogCategory).filter(BlogCategory.slug == slug).first():
@@ -56,7 +56,7 @@ def update_blog_category(
     slug: str = Form(...),
     display_order: int | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
     category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
 
@@ -98,7 +98,7 @@ def update_blog_category(
 def delete_blog_category(
     category_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
     category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
 
@@ -145,7 +145,7 @@ async def create_blog(
     published_at: datetime | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
     # بررسی تکراری نبودن اسلاگ
     if db.query(Blog).filter(Blog.slug == slug).first():
@@ -235,7 +235,7 @@ async def update_blog(
     published_at: datetime | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
     blog = db.query(Blog).filter(Blog.id == blog_id).first()
 
@@ -340,7 +340,7 @@ async def update_blog(
 def delete_blog(
     blog_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
     blog = db.query(Blog).filter(Blog.id == blog_id).first()
 

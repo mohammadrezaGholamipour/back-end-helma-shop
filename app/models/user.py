@@ -1,9 +1,7 @@
-from enum import Enum
-
-from sqlalchemy import Boolean, Column, Enum as SQLEnum, Integer, String
+from sqlalchemy import Column, Enum as SQLEnum, Integer, String
 from sqlalchemy.orm import relationship
-
 from app.db.base import Base
+from enum import Enum
 
 
 class UserRole(str, Enum):
@@ -43,18 +41,6 @@ class User(Base):
         SQLEnum(UserRole),
         nullable=False,
         default=UserRole.CUSTOMER,
-    )
-
-    is_active = Column(
-        Boolean,
-        nullable=False,
-        default=True,
-    )
-
-    is_verified = Column(
-        Boolean,
-        nullable=False,
-        default=False,
     )
 
     categories = relationship(

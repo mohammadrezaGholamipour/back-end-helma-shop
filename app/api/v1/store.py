@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, HTTPException
-from app.core.security import get_current_user
+from app.core.security import get_current_admin
 from app.schemas.store import StoreOut
 from sqlalchemy.orm import Session
 from app.models.store import Store
@@ -25,10 +25,10 @@ def create_store(
     telegram: str | None = Form(None),
     whatsapp: str | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
-    store = db.query(Store).filter(Store.owner_id == current_user.id).first()
+    store = db.query(Store).first()
 
     if store:
 
@@ -85,10 +85,10 @@ def update_store(
     address: str | None = Form(None),
     phone: str | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
-    store = db.query(Store).filter(Store.owner_id == current_user.id).first()
+    store = db.query(Store).first()
 
     if not store:
         raise HTTPException(
@@ -122,8 +122,8 @@ def update_store(
 # =====================
 
 
-@router.get("/me", response_model=StoreOut)
-def get_my_store(
+@router.get("", response_model=StoreOut)
+def get_store(
     db: Session = Depends(get_db),
 ):
 

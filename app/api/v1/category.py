@@ -21,7 +21,7 @@ from app.schemas.category import (
     CategoryOrderItem,
 )
 
-from app.core.security import get_current_user
+from app.core.security import get_current_admin
 
 import uuid
 import os
@@ -52,7 +52,7 @@ def create_category(
     meta_description: str | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     exists_name = (
@@ -135,7 +135,7 @@ def create_category(
 
 
 @router.get(
-    "/me",
+    "",
     response_model=list[CategoryOut],
 )
 def get_my_categories(
@@ -154,7 +154,7 @@ def get_my_categories(
 def delete_category(
     category_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     category = (
@@ -233,7 +233,7 @@ def update_category(
     meta_description: str | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     category = (
@@ -306,7 +306,7 @@ def update_category(
 def update_category_display_order(
     items: list[CategoryOrderItem],
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     ids = [item.id for item in items]

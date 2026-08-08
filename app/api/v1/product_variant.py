@@ -14,14 +14,13 @@ from sqlalchemy.orm import Session
 from app.services.social_manager import notify_new_product
 from app.models.product_variant import ProductVariant
 from app.schemas.product import ProductVariantOut
-from app.core.security import get_current_user
+from app.core.security import get_current_admin
 from app.models.product import Product
 from app.models.user import User
 from app.db.session import get_db
 
 import uuid
 import os
-
 
 router = APIRouter(
     prefix="/helma-shop-api/v1/variant",
@@ -41,19 +40,14 @@ def save_image(image: UploadFile | None):
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(
             status_code=400,
-            detail={
-                "message": "فایل باید تصویر باشد"
-            },
+            detail={"message": "فایل باید تصویر باشد"},
         )
 
     ext = os.path.splitext(image.filename)[1]
 
     filename = f"var_{uuid.uuid4().hex}{ext}"
 
-    file_path = os.path.join(
-        UPLOAD_DIR,
-        filename
-    )
+    file_path = os.path.join(UPLOAD_DIR, filename)
 
     with open(file_path, "wb") as buffer:
         buffer.write(image.file.read())
@@ -61,10 +55,10 @@ def save_image(image: UploadFile | None):
     return f"/uploads/products/{filename}"
 
 
-
 # =====================================================
 # CREATE VARIANT
 # =====================================================
+
 
 @router.post(
     "/{product_id}",
@@ -78,28 +72,23 @@ async def create_variant(
     stock: int = Form(0),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     product = (
         db.query(Product)
         .join(Product.category)
         .filter(
-            Product.id == product_id,
-            Product.category.has(owner_id=current_user.id)
+            Product.id == product_id, Product.category.has(owner_id=current_user.id)
         )
         .first()
     )
 
-
     if not product:
         raise HTTPException(
             status_code=404,
-            detail={
-                "message": "محصول یافت نشد"
-            },
+            detail={"message": "محصول یافت نشد"},
         )
-
 
     exists = (
         db.query(ProductVariant)
@@ -110,18 +99,13 @@ async def create_variant(
         .first()
     )
 
-
     if exists:
         raise HTTPException(
             status_code=400,
-            detail={
-                "message": "این وزن قبلاً ثبت شده است"
-            },
+            detail={"message": "این وزن قبلاً ثبت شده است"},
         )
 
-
     image_url = save_image(image)
-
 
     variant = ProductVariant(
         product_id=product_id,
@@ -131,12 +115,9 @@ async def create_variant(
         image=image_url,
     )
 
-
     db.add(variant)
     db.commit()
     db.refresh(variant)
-
-
 
     background_tasks.add_task(
         notify_new_product,
@@ -146,14 +127,13 @@ async def create_variant(
         volume,
     )
 
-
     return variant
-
 
 
 # =====================================================
 # UPDATE VARIANT
 # =====================================================
+
 
 @router.patch(
     "/{variant_id}",
@@ -166,7 +146,7 @@ async def update_variant(
     stock: int | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     variant = (
@@ -175,50 +155,56 @@ async def update_variant(
         .join(Product.category)
         .filter(
             ProductVariant.id == variant_id,
-            Product.category.has(owner_id=current_user.id)
+            Product.category.has(owner_id=current_user.id),
         )
         .first()
     )
 
-
     if not variant:
         raise HTTPException(
             status_code=404,
-            detail={
-                "message": "وریانت یافت نشد"
-            },
+            detail={"message": "وریانت یافت نشد"},
         )
 
-
     if volume is not None:
-        variant.volume = volume
+        exists = (
+            db.query(ProductVariant)
+            .filter(
+                ProductVariant.product_id == variant.product_id,
+                ProductVariant.volume == volume,
+                ProductVariant.id != variant_id,
+            )
+            .first()
+        )
 
+        if exists:
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "این وزن قبلاً برای این محصول ثبت شده است"},
+            )
+
+        variant.volume = volume
 
     if price is not None:
         variant.price = price
 
-
     if stock is not None:
         variant.stock = stock
-
 
     if image:
 
         variant.image = save_image(image)
 
-
-
     db.commit()
     db.refresh(variant)
 
-
     return variant
-
 
 
 # =====================================================
 # DELETE VARIANT
 # =====================================================
+
 
 @router.delete(
     "/{variant_id}",
@@ -227,7 +213,7 @@ async def update_variant(
 def delete_variant(
     variant_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     variant = (
@@ -236,23 +222,18 @@ def delete_variant(
         .join(Product.category)
         .filter(
             ProductVariant.id == variant_id,
-            Product.category.has(owner_id=current_user.id)
+            Product.category.has(owner_id=current_user.id),
         )
         .first()
     )
 
-
     if not variant:
         raise HTTPException(
             status_code=404,
-            detail={
-                "message": "وریانت یافت نشد"
-            },
+            detail={"message": "وریانت یافت نشد"},
         )
-
 
     db.delete(variant)
     db.commit()
-
 
     return None

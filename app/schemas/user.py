@@ -126,10 +126,6 @@ class UserOut(BaseModel):
 
     role: UserRole
 
-    is_active: bool
-
-    is_verified: bool
-
 
     model_config = ConfigDict(
         from_attributes=True,

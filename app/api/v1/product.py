@@ -22,7 +22,7 @@ from app.enums.product import ProductType, ProductModel, OilType
 
 from app.schemas.product import ProductOut
 
-from app.core.security import get_current_user
+from app.core.security import get_current_admin
 
 from typing import List
 
@@ -58,7 +58,7 @@ async def create_product(
     is_packaged: bool | None = Form(None),
     image: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     # بررسی مالکیت دسته بندی
@@ -134,8 +134,8 @@ async def create_product(
 # =====================
 
 
-@router.get("/me", response_model=list[ProductOut])
-def get_my_products(
+@router.get("", response_model=list[ProductOut])
+def get_products(
     search: str | None = Query(None),
     min_price: int | None = Query(None, ge=0),
     max_price: int | None = Query(None, ge=0),
@@ -229,7 +229,7 @@ def update_product(
     image: UploadFile | None = File(None),
     is_packaged: bool | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     product = (
@@ -347,7 +347,7 @@ def update_product(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
 ):
 
     product = (

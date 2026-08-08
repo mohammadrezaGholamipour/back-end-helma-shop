@@ -84,9 +84,6 @@ def register(
         password_hash=hash_password(user.password),
 
         role=UserRole.CUSTOMER,
-
-        is_active=True,
-        is_verified=False,
     )
 
 
@@ -143,16 +140,6 @@ def login(
             detail={
                 "field": "username or password",
                 "message": "نام کاربری یا رمز عبور اشتباه است"
-            }
-        )
-
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "field": "account",
-                "message": "حساب کاربری غیرفعال است"
             }
         )
 
