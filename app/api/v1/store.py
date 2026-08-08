@@ -1,17 +1,12 @@
 from fastapi import APIRouter, Depends, Form, HTTPException
-from sqlalchemy.orm import Session
-
-from app.schemas.store import StoreOut
 from app.core.security import get_current_user
-from app.db.session import get_db
-
+from app.schemas.store import StoreOut
+from sqlalchemy.orm import Session
 from app.models.store import Store
+from app.db.session import get_db
 from app.models.user import User
 
-router = APIRouter(
-    prefix="/helma-shop-api/v1/store",
-    tags=["Store"],
-)
+router = APIRouter(prefix="/helma-shop-api/v1/store", tags=["Store"])
 
 
 # =====================
@@ -130,10 +125,9 @@ def update_store(
 @router.get("/me", response_model=StoreOut)
 def get_my_store(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
 
-    store = db.query(Store).filter(Store.owner_id == current_user.id).first()
+    store = db.query(Store).first()
 
     if not store:
         raise HTTPException(

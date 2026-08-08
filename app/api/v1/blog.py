@@ -1,69 +1,22 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    Form,
-    HTTPException,
-    UploadFile,
-    File,
-    Query,
-)
-
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-
-from app.schemas.blog import (
-    BlogOut,
-    BlogListOut,
-    BlogCategoryOut,
-)
-
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, Query
+from app.schemas.blog import BlogOut, BlogListOut, BlogCategoryOut
 from app.models.blog_category import BlogCategory
-from app.models.blog import Blog
-from app.models.user import User
-
-from app.enums.blog import BlogStatus
-
 from app.core.security import get_current_user
+from app.enums.blog import BlogStatus
+from sqlalchemy.orm import Session
 from app.db.session import get_db
-
+from app.models.user import User
+from app.models.blog import Blog
 from datetime import datetime
-
+from sqlalchemy import func
 import uuid
 import os
 
-router = APIRouter(
-    prefix="/helma-shop-api/v1/blog",
-    tags=["Blog"],
-)
+router = APIRouter(prefix="/helma-shop-api/v1/blog", tags=["Blog"])
 
 
 UPLOAD_DIR = "uploads/blogs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-
-def save_image(image: UploadFile | None):
-
-    if not image:
-        return None
-
-    if not image.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="فایل باید تصویر باشد")
-
-    ext = os.path.splitext(image.filename)[1]
-
-    filename = f"{uuid.uuid4().hex}{ext}"
-
-    path = os.path.join(UPLOAD_DIR, filename)
-
-    with open(path, "wb") as buffer:
-        buffer.write(image.file.read())
-
-    return f"/uploads/blogs/{filename}"
-
-
-# =====================================================
-# CREATE BLOG CATEGORY
-# =====================================================
 
 
 @router.post("/create-category", response_model=BlogCategoryOut)
@@ -74,27 +27,19 @@ def create_blog_category(
     current_user: User = Depends(get_current_user),
 ):
 
-    exists = (
-        db.query(BlogCategory)
-        .filter(BlogCategory.slug == slug, BlogCategory.owner_id == current_user.id)
-        .first()
-    )
+    if db.query(BlogCategory).filter(BlogCategory.slug == slug).first():
+        raise HTTPException(
+            status_code=400,
+            detail="این اسلاگ قبلاً ثبت شده است",
+        )
 
-    if exists:
-        raise HTTPException(status_code=400, detail="این اسلاگ قبلا ثبت شده است")
-
-    order = (
-        db.query(func.max(BlogCategory.display_order))
-        .filter(BlogCategory.owner_id == current_user.id)
-        .scalar()
-        or 0
-    )
+    # ترتیب نمایش
+    last_order = db.query(func.max(BlogCategory.display_order)).scalar() or 0
 
     category = BlogCategory(
-        owner_id=current_user.id,
         name=name,
         slug=slug,
-        display_order=order + 1,
+        display_order=last_order + 1,
     )
 
     db.add(category)
@@ -104,12 +49,7 @@ def create_blog_category(
     return category
 
 
-# =====================================================
-# UPDATE BLOG CATEGORY
-# =====================================================
-
-
-@router.put("/category/{category_id}", response_model=BlogCategoryOut)
+@router.put("/{category_id}", response_model=BlogCategoryOut)
 def update_blog_category(
     category_id: int,
     name: str = Form(...),
@@ -118,31 +58,34 @@ def update_blog_category(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
 
-    category = (
+    if not category:
+        raise HTTPException(
+            status_code=404,
+            detail="دسته‌بندی یافت نشد",
+        )
+
+    # بررسی تکراری نبودن اسلاگ
+    slug_exists = (
         db.query(BlogCategory)
         .filter(
-            BlogCategory.id == category_id, BlogCategory.owner_id == current_user.id
+            BlogCategory.slug == slug,
+            BlogCategory.id != category_id,
         )
         .first()
     )
 
-    if not category:
-        raise HTTPException(status_code=404, detail="دسته بندی یافت نشد")
-
-    exists = (
-        db.query(BlogCategory)
-        .filter(BlogCategory.slug == slug, BlogCategory.id != category_id)
-        .first()
-    )
-
-    if exists:
-        raise HTTPException(status_code=400, detail="این اسلاگ قبلا استفاده شده")
+    if slug_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="این اسلاگ قبلاً ثبت شده است",
+        )
 
     category.name = name
     category.slug = slug
 
-    if display_order is not None:
+    if display_order:
         category.display_order = display_order
 
     db.commit()
@@ -151,54 +94,39 @@ def update_blog_category(
     return category
 
 
-# =====================================================
-# DELETE BLOG CATEGORY
-# =====================================================
-
-
-@router.delete("/category/{category_id}")
+@router.delete("/{category_id}")
 def delete_blog_category(
     category_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
-    category = (
-        db.query(BlogCategory)
-        .filter(
-            BlogCategory.id == category_id, BlogCategory.owner_id == current_user.id
-        )
-        .first()
-    )
+    category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
 
     if not category:
-        raise HTTPException(status_code=404, detail="دسته بندی یافت نشد")
+        raise HTTPException(
+            status_code=404,
+            detail="دسته‌بندی یافت نشد",
+        )
 
     if category.blogs:
-        raise HTTPException(status_code=400, detail="این دسته بندی دارای مقاله است")
+        raise HTTPException(
+            status_code=400,
+            detail="این دسته‌بندی دارای مقاله است و قابل حذف نیست.",
+        )
 
     db.delete(category)
     db.commit()
 
-    return {"message": "دسته بندی حذف شد"}
-
-
-# =====================================================
-# WEBSITE CATEGORY LIST
-# =====================================================
+    return {"message": "دسته‌بندی با موفقیت حذف شد."}
 
 
 @router.get("/website/categories/list", response_model=list[BlogCategoryOut])
-def website_categories(
+def get_website_blog_categories(
     db: Session = Depends(get_db),
 ):
+    categories = db.query(BlogCategory).order_by(BlogCategory.display_order.asc()).all()
 
-    return db.query(BlogCategory).order_by(BlogCategory.display_order.asc()).all()
-
-
-# =====================================================
-# CREATE BLOG
-# =====================================================
+    return categories
 
 
 @router.post("/create-blog", response_model=BlogOut)
@@ -219,51 +147,278 @@ async def create_blog(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
-    exists = db.query(Blog).filter(Blog.slug == slug).first()
-
-    if exists:
-        raise HTTPException(status_code=400, detail="این اسلاگ قبلا ثبت شده")
-
-    category = (
-        db.query(BlogCategory)
-        .filter(
-            BlogCategory.id == category_id, BlogCategory.owner_id == current_user.id
+    # بررسی تکراری نبودن اسلاگ
+    if db.query(Blog).filter(Blog.slug == slug).first():
+        raise HTTPException(
+            status_code=400,
+            detail="این اسلاگ قبلاً ثبت شده است",
         )
-        .first()
-    )
+
+    # بررسی وجود دسته‌بندی
+    category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
 
     if not category:
-        raise HTTPException(status_code=404, detail="دسته بندی یافت نشد")
+        raise HTTPException(
+            status_code=404,
+            detail="دسته‌بندی یافت نشد.",
+        )
 
+    # آپلود تصویر
+    image_url = None
+
+    if image:
+        if image.filename is None:
+            raise HTTPException(
+                status_code=400,
+                detail="نام فایل معتبر نیست.",
+            )
+
+        ext = os.path.splitext(image.filename)[1]
+        filename = f"{uuid.uuid4().hex}{ext}"
+
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        with open(file_path, "wb") as buffer:
+            buffer.write(await image.read())
+
+        image_url = f"/uploads/blogs/{filename}"
+
+    # تعیین ترتیب نمایش داخل همان دسته‌بندی
     if display_order is None:
-
-        display_order = (
+        last_order = (
             db.query(func.max(Blog.display_order))
             .filter(Blog.category_id == category_id)
             .scalar()
             or 0
-        ) + 1
+        )
+
+        display_order = last_order + 1
 
     blog = Blog(
-        owner_id=current_user.id,
         title=title,
         slug=slug,
         category_id=category_id,
-        content=content,
         summary=summary,
+        content=content,
+        image=image_url,
         status=status,
         display_order=display_order,
         reading_time=reading_time,
+        views=0,
         is_featured=is_featured,
         meta_title=meta_title,
         meta_description=meta_description,
         published_at=published_at,
-        image=save_image(image),
-        views=0,
     )
 
     db.add(blog)
+    db.commit()
+    db.refresh(blog)
+
+    return blog
+
+
+@router.put("/update/{blog_id}", response_model=BlogOut)
+async def update_blog(
+    blog_id: int,
+    title: str | None = Form(None),
+    slug: str | None = Form(None),
+    category_id: int | None = Form(None),
+    content: str | None = Form(None),
+    summary: str | None = Form(None),
+    status: BlogStatus | None = Form(None),
+    display_order: int | None = Form(None),
+    reading_time: int | None = Form(None),
+    is_featured: bool | None = Form(None),
+    meta_title: str | None = Form(None),
+    meta_description: str | None = Form(None),
+    published_at: datetime | None = Form(None),
+    image: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    blog = db.query(Blog).filter(Blog.id == blog_id).first()
+
+    if not blog:
+        raise HTTPException(
+            status_code=404,
+            detail="مقاله یافت نشد.",
+        )
+
+    # بررسی اسلاگ فقط در صورتی که ارسال شده باشد
+    if slug is not None:
+        slug_exists = (
+            db.query(Blog)
+            .filter(
+                Blog.slug == slug,
+                Blog.id != blog_id,
+            )
+            .first()
+        )
+
+        if slug_exists:
+            raise HTTPException(
+                status_code=400,
+                detail="این اسلاگ قبلاً ثبت شده است",
+            )
+
+    # بررسی دسته‌بندی فقط در صورتی که ارسال شده باشد
+    if category_id is not None:
+        category = db.query(BlogCategory).filter(BlogCategory.id == category_id).first()
+
+        if not category:
+            raise HTTPException(
+                status_code=404,
+                detail="دسته‌بندی یافت نشد.",
+            )
+
+        blog.category_id = category_id
+
+
+    if image:
+        if image.filename is None:
+            raise HTTPException(
+                status_code=400,
+                detail="نام فایل معتبر نیست.",
+            )
+
+        if blog.image:
+            old_image = blog.image.lstrip("/")
+            if os.path.exists(old_image):
+                os.remove(old_image)
+
+        ext = os.path.splitext(image.filename)[1]
+        filename = f"{uuid.uuid4().hex}{ext}"
+
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        with open(file_path, "wb") as buffer:
+            buffer.write(await image.read())
+
+        blog.image = f"/uploads/blogs/{filename}"
+
+    if title is not None:
+        blog.title = title
+
+    if slug is not None:
+        blog.slug = slug
+
+    if content is not None:
+        blog.content = content
+
+    if summary is not None:
+        blog.summary = summary
+
+    if status is not None:
+        blog.status = status
+
+    if display_order is not None:
+        blog.display_order = display_order
+
+    if reading_time is not None:
+        blog.reading_time = reading_time
+
+    if is_featured is not None:
+        blog.is_featured = is_featured
+
+    if meta_title is not None:
+        blog.meta_title = meta_title
+
+    if meta_description is not None:
+        blog.meta_description = meta_description
+
+    if published_at is not None:
+        blog.published_at = published_at
+
+    db.commit()
+    db.refresh(blog)
+
+    return blog
+
+
+@router.delete("/delete/{blog_id}")
+def delete_blog(
+    blog_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    blog = db.query(Blog).filter(Blog.id == blog_id).first()
+
+    if not blog:
+        raise HTTPException(
+            status_code=404,
+            detail="مقاله یافت نشد.",
+        )
+
+    # حذف تصویر
+    if blog.image:
+        image_path = blog.image.lstrip("/")
+        if os.path.exists(image_path):
+            os.remove(image_path)
+
+    db.delete(blog)
+    db.commit()
+
+    return {"message": "مقاله با موفقیت حذف شد."}
+
+
+@router.get("/website/blog/list", response_model=BlogListOut)
+def get_website_blogs(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(9, ge=1, le=100),
+    search: str | None = Query(None),
+    category: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Blog).join(BlogCategory)
+
+    # جستجو
+    if search:
+        query = query.filter(Blog.title.ilike(f"%{search}%"))
+
+    # فیلتر دسته‌بندی با slug
+    if category:
+        query = query.filter(BlogCategory.slug == category)
+
+    total = query.count()
+
+    blogs = (
+        query.order_by(
+            Blog.is_featured.desc(),
+            Blog.display_order.asc(),
+            Blog.published_at.desc(),
+        )
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    last_page = (total + per_page - 1) // per_page
+
+    return BlogListOut(
+        blogs=blogs,
+        total=total,
+        page=page,
+        per_page=per_page,
+        last_page=last_page,
+    )
+
+
+@router.get("/website/{slug}", response_model=BlogOut)
+def get_blog_by_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+):
+    blog = db.query(Blog).filter(Blog.slug == slug).first()
+
+    if not blog:
+        raise HTTPException(
+            status_code=404,
+            detail="مقاله یافت نشد.",
+        )
+
+    blog.views += 1
+
     db.commit()
     db.refresh(blog)
 
