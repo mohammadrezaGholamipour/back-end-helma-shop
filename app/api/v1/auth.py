@@ -56,7 +56,10 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(form_data: Annotated[LoginRequest, Depends()], db: Session = Depends(get_db)):
+def login(
+    form_data: LoginRequest,
+    db: Session = Depends(get_db),
+):
 
     user = db.query(User).filter(User.mobile == form_data.mobile).first()
 
