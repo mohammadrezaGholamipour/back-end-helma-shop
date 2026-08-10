@@ -1,9 +1,5 @@
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict, EmailStr
-
-
-from pydantic import BaseModel, ConfigDict, EmailStr
+from decimal import Decimal
 
 
 class CustomerProfileBase(BaseModel):
@@ -11,11 +7,15 @@ class CustomerProfileBase(BaseModel):
     last_name: str | None = None
     email: EmailStr | None = None
 
+    address: str | None = None
+    postal_code: str | None = None
 
-class CustomerProfileUpdate(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
-    email: EmailStr | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+
+
+class CustomerProfileUpdate(CustomerProfileBase):
+    pass
 
 
 class CustomerProfileOut(CustomerProfileBase):

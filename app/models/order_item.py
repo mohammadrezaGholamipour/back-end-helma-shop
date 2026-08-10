@@ -3,6 +3,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Numeric,
+    String,
 )
 from sqlalchemy.orm import relationship
 
@@ -25,11 +26,11 @@ class OrderItem(Base):
         index=True,
     )
 
-    product_id = Column(
-        Integer,
-        ForeignKey("products.id", ondelete="RESTRICT"),
+    product_id = Column(Integer, nullable=True, index=True)
+
+    product_name = Column(
+        String,
         nullable=False,
-        index=True,
     )
 
     quantity = Column(

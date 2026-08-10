@@ -1,7 +1,7 @@
 from app.schemas.customer import CustomerProfileOut, CustomerProfileUpdate
 from app.models.customer_profile import CustomerProfile
-from fastapi import APIRouter, Depends, HTTPException
 from app.core.security import get_current_user
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
@@ -64,13 +64,11 @@ def update_my_profile(
     )
 
     if not profile:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "field": "profile",
-                "message": "اطلاعات کاربری یافت نشد",
-            },
+        profile = CustomerProfile(
+            user_id=current_user.id,
         )
+
+        db.add(profile)
 
     update_data = data.model_dump(exclude_unset=True)
 

@@ -1,6 +1,5 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String, Numeric
 from sqlalchemy.orm import relationship
-
 from app.db.base import Base
 
 
@@ -36,6 +35,26 @@ class CustomerProfile(Base):
         nullable=True,
         unique=True,
         index=True,
+    )
+
+    address = Column(
+        String,
+        nullable=True,
+    )
+
+    postal_code = Column(
+        String,
+        nullable=True,
+    )
+
+    latitude = Column(
+        Numeric(10, 7),
+        nullable=True,
+    )
+
+    longitude = Column(
+        Numeric(10, 7),
+        nullable=True,
     )
 
     user = relationship(

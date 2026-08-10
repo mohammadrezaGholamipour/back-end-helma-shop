@@ -1,5 +1,3 @@
-from enum import Enum
-
 from sqlalchemy import (
     Column,
     Enum as SQLEnum,
@@ -9,8 +7,8 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.orm import relationship
-
 from app.db.base import Base
+from enum import Enum
 
 
 class OrderStatus(str, Enum):
@@ -36,6 +34,39 @@ class Order(Base):
         nullable=False,
         index=True,
     )
+
+    # =========================
+    # Receiver Snapshot
+    # =========================
+
+    receiver_first_name = Column(
+        String,
+        nullable=False,
+    )
+
+    receiver_last_name = Column(
+        String,
+        nullable=False,
+    )
+
+    receiver_mobile = Column(
+        String,
+        nullable=False,
+    )
+
+    receiver_address = Column(
+        String,
+        nullable=False,
+    )
+
+    receiver_postal_code = Column(
+        String,
+        nullable=True,
+    )
+
+    # =========================
+    # Order
+    # =========================
 
     status = Column(
         SQLEnum(OrderStatus),
@@ -64,6 +95,16 @@ class Order(Base):
     payable_amount = Column(
         Numeric(12, 2),
         nullable=False,
+    )
+    
+    receiver_latitude = Column(
+    Numeric(10, 7),
+    nullable=True,
+    )
+
+    receiver_longitude = Column(
+    Numeric(10, 7),
+    nullable=True,
     )
 
     user = relationship(
