@@ -25,7 +25,3 @@ class Product(Base):
     variants = relationship(
         "ProductVariant", back_populates="product", cascade="all, delete-orphan"
     )
-    order_items = relationship(
-        "OrderItem",
-        back_populates="product",
-    )
