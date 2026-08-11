@@ -4,7 +4,8 @@ from app.models.blog_category import BlogCategory
 from app.models.order_item import OrderItem
 from app.models.category import Category
 from app.models.product import Product
-from app.models.order import Order
+from app.models.slider import Slider
 from app.models.store import Store
+from app.models.order import Order
 from app.models.blog import Blog
 from app.models.user import User
