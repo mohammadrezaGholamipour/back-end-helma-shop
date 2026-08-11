@@ -17,7 +17,6 @@ from app.models.user import User
 from app.schemas.slider import SliderOut
 from app.core.security import get_current_admin
 
-
 router = APIRouter(
     prefix="/helma-shop-api/v1/slider",
     tags=["Slider"],
@@ -31,6 +30,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # =====================================================
 # CREATE SLIDER
 # =====================================================
+
 
 @router.post(
     "/create",
@@ -102,19 +102,16 @@ def create_slider(
 # GET ALL SLIDERS
 # =====================================================
 
+
 @router.get(
     "/list",
     response_model=list[SliderOut],
 )
 def get_sliders(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
 ):
     sliders = (
         db.query(Slider)
-        .filter(
-            Slider.owner_id == current_user.id,
-        )
         .order_by(
             Slider.display_order.asc(),
         )
@@ -125,41 +122,9 @@ def get_sliders(
 
 
 # =====================================================
-# GET SLIDER
-# =====================================================
-
-@router.get(
-    "/{slider_id}",
-    response_model=SliderOut,
-)
-def get_slider(
-    slider_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
-):
-    slider = (
-        db.query(Slider)
-        .filter(
-            Slider.id == slider_id,
-            Slider.owner_id == current_user.id,
-        )
-        .first()
-    )
-
-    if not slider:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "message": "اسلایدر پیدا نشد",
-            },
-        )
-
-    return slider
-
-
-# =====================================================
 # UPDATE SLIDER
 # =====================================================
+
 
 @router.put(
     "/{slider_id}",
@@ -194,10 +159,7 @@ def update_slider(
     # ==========================================
 
     if image:
-        if (
-            not image.content_type
-            or not image.content_type.startswith("image/")
-        ):
+        if not image.content_type or not image.content_type.startswith("image/"):
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -259,6 +221,7 @@ def update_slider(
 # =====================================================
 # DELETE SLIDER
 # =====================================================
+
 
 @router.delete(
     "/{slider_id}",
