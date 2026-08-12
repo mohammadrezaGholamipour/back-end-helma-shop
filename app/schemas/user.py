@@ -11,10 +11,10 @@ from pydantic_core import PydanticCustomError
 
 from app.models.user import UserRole
 
-
 # =====================================================
 # REGISTER
 # =====================================================
+
 
 class UserCreate(BaseModel):
     mobile: str
@@ -39,40 +39,16 @@ class UserCreate(BaseModel):
 
         return v
 
-
     @field_validator("password")
     @classmethod
-    def strong_password(cls, v: str) -> str:
-
+    def validate_password(cls, v: str) -> str:
         if len(v) < 6:
             raise PydanticCustomError(
                 "password",
                 "رمز عبور حداقل باید ۶ کاراکتر داشته باشد",
             )
 
-        if not re.search(r"[A-Za-z]", v):
-            raise PydanticCustomError(
-                "password",
-                "رمز عبور باید شامل حروف باشد",
-            )
-
-        if not re.search(r"\d", v):
-            raise PydanticCustomError(
-                "password",
-                "رمز عبور باید شامل اعداد باشد",
-            )
-
-        if not re.search(
-            r"[!@#$%^&*(),.?\":{}|<>]",
-            v
-        ):
-            raise PydanticCustomError(
-                "password",
-                "رمز عبور باید شامل کاراکتر ویژه باشد",
-            )
-
         return v
-
 
     @field_validator("repeat_password")
     @classmethod
@@ -93,10 +69,10 @@ class UserCreate(BaseModel):
         return v
 
 
-
 # =====================================================
 # USER OUTPUT
 # =====================================================
+
 
 class UserOut(BaseModel):
 
@@ -106,17 +82,16 @@ class UserOut(BaseModel):
 
     role: UserRole
 
-
     model_config = ConfigDict(
         from_attributes=True,
         use_enum_values=True,
     )
 
 
-
 # =====================================================
 # TOKEN
 # =====================================================
+
 
 class TokenResponse(BaseModel):
 
@@ -124,6 +99,4 @@ class TokenResponse(BaseModel):
 
     token_type: str = "bearer"
 
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
