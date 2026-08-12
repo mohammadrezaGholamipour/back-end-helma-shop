@@ -19,7 +19,10 @@ router = APIRouter(
 # CREATE ORDER
 # =====================
 
-
+@router.post(
+    "/create",
+    response_model=OrderOut,
+)
 def create_order(
     data: OrderCreate,
     db: Session = Depends(get_db),
