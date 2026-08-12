@@ -1,21 +1,16 @@
+from pydantic import (BaseModel,ConfigDict,ValidationInfo,field_validator)
+from app.schemas.customer import CustomerProfileOut
+from pydantic_core import PydanticCustomError
+from app.schemas.order import OrderOut
+from app.models.user import UserRole
 import re
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    ValidationInfo,
-    field_validator,
-)
 
-from pydantic_core import PydanticCustomError
 
-from app.models.user import UserRole
 
 # =====================================================
 # REGISTER
 # =====================================================
-
-
 class UserCreate(BaseModel):
     mobile: str
 
@@ -72,8 +67,6 @@ class UserCreate(BaseModel):
 # =====================================================
 # USER OUTPUT
 # =====================================================
-
-
 class UserOut(BaseModel):
 
     id: int
@@ -86,13 +79,22 @@ class UserOut(BaseModel):
         from_attributes=True,
         use_enum_values=True,
     )
+    
+    
+class UserListOut(BaseModel):
+    id: int
+    mobile: str
+    role: UserRole
+    orders_count: int = 0
+    customer_profile: CustomerProfileOut | None = None
 
-
+    model_config = ConfigDict(
+        from_attributes=True,
+        use_enum_values=True,
+    )
 # =====================================================
 # TOKEN
 # =====================================================
-
-
 class TokenResponse(BaseModel):
 
     access_token: str
