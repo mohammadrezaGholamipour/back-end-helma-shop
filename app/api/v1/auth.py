@@ -68,7 +68,7 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "field": "mobile or password",
-                "message": "شماره موبایل یا رمز عبور اشتباه است",
+                "message": "ابتدا باید ثبت نام کنید",
             },
         )
 
