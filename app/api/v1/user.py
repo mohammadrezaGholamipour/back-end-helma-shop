@@ -1,14 +1,15 @@
-from typing import List
-
-from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
-
 from app.core.security import get_current_user, get_current_admin
+from sqlalchemy.orm import Session, selectinload
+from app.schemas.user import UserOut, UserListOut
+from app.models.order_item import OrderItem
+from app.models.product import Product
+from fastapi import APIRouter, Depends
+from app.models.order import Order
 from app.db.session import get_db
 from app.models.user import User
-from app.models.order import Order
-from app.schemas.user import UserOut, UserListOut
+from typing import List
+
+
 
 router = APIRouter(
     prefix="/helma-shop-api/v1/user",
@@ -32,27 +33,17 @@ def get_me(
     dependencies=[Depends(get_current_admin)],
 )
 def list_users(db: Session = Depends(get_db)):
-    orders_count_subq = (
-        select(Order.user_id, func.count(Order.id).label("orders_count"))
-        .group_by(Order.user_id)
-        .subquery()
-    )
-
-    rows = (
-        db.query(User, orders_count_subq.c.orders_count)
-        .outerjoin(
-            orders_count_subq,
-            User.id == orders_count_subq.c.user_id,
+    users = (
+        db.query(User)
+        .options(
+            selectinload(User.customer_profile),
+            selectinload(User.orders)
+            .selectinload(Order.items)
+            .selectinload(OrderItem.product)
+            .selectinload(Product.variants),
         )
-        .options(selectinload(User.customer_profile))
         .order_by(User.id.desc())
         .all()
     )
 
-    result: List[UserListOut] = []
-    for user, orders_count in rows:
-        item = UserListOut.model_validate(user)
-        item.orders_count = orders_count or 0
-        result.append(item)
-
-    return result
+    return users
