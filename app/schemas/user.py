@@ -1,11 +1,9 @@
-from pydantic import (BaseModel,ConfigDict,ValidationInfo,field_validator)
+from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator, Field
 from app.schemas.customer import CustomerProfileOut
 from pydantic_core import PydanticCustomError
 from app.schemas.order import OrderOut
 from app.models.user import UserRole
 import re
-
-
 
 
 # =====================================================
@@ -79,19 +77,21 @@ class UserOut(BaseModel):
         from_attributes=True,
         use_enum_values=True,
     )
-    
-    
+
+
 class UserListOut(BaseModel):
     id: int
     mobile: str
     role: UserRole
     orders_count: int = 0
     customer_profile: CustomerProfileOut | None = None
-
+    orders: list[OrderOut] = Field(default_factory=list)
     model_config = ConfigDict(
         from_attributes=True,
         use_enum_values=True,
     )
+
+
 # =====================================================
 # TOKEN
 # =====================================================
