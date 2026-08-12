@@ -5,13 +5,8 @@ from decimal import Decimal
 class CustomerProfileBase(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
-    email: EmailStr | None = None
-
     address: str | None = None
     postal_code: str | None = None
-
-    latitude: Decimal | None = None
-    longitude: Decimal | None = None
 
 
 class CustomerProfileUpdate(CustomerProfileBase):

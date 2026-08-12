@@ -30,13 +30,6 @@ class CustomerProfile(Base):
         nullable=True,
     )
 
-    email = Column(
-        String,
-        nullable=True,
-        unique=True,
-        index=True,
-    )
-
     address = Column(
         String,
         nullable=True,
@@ -44,16 +37,6 @@ class CustomerProfile(Base):
 
     postal_code = Column(
         String,
-        nullable=True,
-    )
-
-    latitude = Column(
-        Numeric(10, 7),
-        nullable=True,
-    )
-
-    longitude = Column(
-        Numeric(10, 7),
         nullable=True,
     )
 
