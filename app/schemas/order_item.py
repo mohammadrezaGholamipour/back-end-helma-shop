@@ -3,6 +3,7 @@ from decimal import Decimal
 
 class OrderItemCreate(BaseModel):
     product_id: int
+    variant_id: int
     quantity: int
 
 
