@@ -1,9 +1,10 @@
+from app.schemas.order import OrderCreate, OrderOut,OrderItemOut
 from app.models.customer_profile import CustomerProfile
 from fastapi import APIRouter, Depends, HTTPException
-from app.schemas.order import OrderCreate, OrderOut
 from app.models.order import Order, OrderStatus
 from sqlalchemy.orm import Session, joinedload
 from app.core.security import get_current_user
+from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.db.session import get_db
 from app.models.user import User
@@ -19,10 +20,6 @@ router = APIRouter(
 # =====================
 
 
-@router.post(
-    "",
-    response_model=OrderOut,
-)
 def create_order(
     data: OrderCreate,
     db: Session = Depends(get_db),
@@ -56,7 +53,7 @@ def create_order(
             status_code=400,
             detail={
                 "field": "profile",
-                "message": "نام و نام خانوادگی گیرنده وارد نشده است",
+                "message": "نام و نام خانوادگی خود را وارد کنید",
             },
         )
 
@@ -65,7 +62,20 @@ def create_order(
             status_code=400,
             detail={
                 "field": "address",
-                "message": "آدرس گیرنده وارد نشده است",
+                "message": "لطفاً آدرس خود را وارد کنید",
+            },
+        )
+
+    # =====================
+    # CHECK ORDER ITEMS
+    # =====================
+
+    if not data.items:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "field": "items",
+                "message": "سبد خرید خالی است",
             },
         )
 
@@ -81,8 +91,12 @@ def create_order(
         receiver_mobile=current_user.mobile,
         receiver_latitude=profile.latitude,
         receiver_address=profile.address,
+
+        # Order starts as pending
         status=OrderStatus.PENDING,
+
         user_id=current_user.id,
+
         discount_amount=0,
         shipping_amount=0,
         payable_amount=0,
@@ -100,16 +114,9 @@ def create_order(
 
     for item_data in data.items:
 
-        product = db.query(Product).filter(Product.id == item_data.product_id).first()
-
-        if not product:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "field": "product_id",
-                    "message": "محصول مورد نظر یافت نشد",
-                },
-            )
+        # ---------------------
+        # Validate quantity
+        # ---------------------
 
         if item_data.quantity <= 0:
             raise HTTPException(
@@ -120,13 +127,80 @@ def create_order(
                 },
             )
 
-        unit_price = product.price
+        # ---------------------
+        # Get product
+        # ---------------------
+
+        product = (
+            db.query(Product)
+            .filter(Product.id == item_data.product_id)
+            .first()
+        )
+
+        if not product:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "field": "product_id",
+                    "message": "محصول مورد نظر یافت نشد",
+                },
+            )
+
+        # ---------------------
+        # Get variant
+        # ---------------------
+
+        variant = (
+            db.query(ProductVariant)
+            .filter(
+                ProductVariant.id == item_data.variant_id,
+                ProductVariant.product_id == product.id,
+            )
+            .first()
+        )
+
+        if not variant:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "field": "variant_id",
+                    "message": "تنوع محصول مورد نظر یافت نشد",
+                },
+            )
+
+        # ---------------------
+        # Get price from database
+        # ---------------------
+
+        unit_price = variant.price
+
+        if unit_price is None:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "field": "price",
+                    "message": "قیمت این محصول مشخص نشده است",
+                },
+            )
+
+        # ---------------------
+        # Calculate item total
+        # ---------------------
+
         total_price = unit_price * item_data.quantity
+
+        # ---------------------
+        # Create order item
+        # ---------------------
 
         order_item = OrderItem(
             order_id=order.id,
             product_id=product.id,
             product_name=product.name,
+
+            # Important: save variant too
+            variant_id=variant.id,
+
             quantity=item_data.quantity,
             unit_price=unit_price,
             total_price=total_price,
@@ -143,18 +217,29 @@ def create_order(
     discount_amount = 0
     shipping_amount = 0
 
-    payable_amount = total_amount - discount_amount + shipping_amount
+    payable_amount = (
+        total_amount
+        - discount_amount
+        + shipping_amount
+    )
 
     order.total_amount = total_amount
     order.discount_amount = discount_amount
     order.shipping_amount = shipping_amount
     order.payable_amount = payable_amount
 
+    # =====================
+    # COMMIT
+    # =====================
+
     db.commit()
 
     db.refresh(order)
 
-    # Load items for response
+    # =====================
+    # LOAD ORDER ITEMS
+    # =====================
+
     order = (
         db.query(Order)
         .options(
@@ -233,3 +318,29 @@ def get_my_order(
         )
 
     return order
+
+
+@router.delete("/{order_id}", status_code=204)
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    order = (
+        db.query(Order)
+        .filter(Order.id == order_id, Order.user_id == current_user.id)
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(status_code=404, detail="سفارش یافت نشد")
+
+    if order.status != OrderStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail="فقط سفارش‌های در انتظار قابل حذف هستند",
+        )
+
+    db.query(OrderItem).filter(OrderItem.order_id == order.id).delete()
+    db.delete(order)
+    db.commit()
