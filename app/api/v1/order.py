@@ -1,6 +1,7 @@
-from app.schemas.order import OrderCreate, OrderOut,OrderItemOut
 from app.models.customer_profile import CustomerProfile
+from app.models.product_variant import ProductVariant
 from fastapi import APIRouter, Depends, HTTPException
+from app.schemas.order import OrderCreate, OrderOut
 from app.models.order import Order, OrderStatus
 from sqlalchemy.orm import Session, joinedload
 from app.core.security import get_current_user
