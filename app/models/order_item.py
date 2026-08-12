@@ -26,7 +26,19 @@ class OrderItem(Base):
         index=True,
     )
 
-    product_id = Column(Integer, nullable=True, index=True)
+    product_id = Column(
+        Integer,
+        ForeignKey("products.id"),
+        nullable=False,
+        index=True,
+    )
+
+    variant_id = Column(
+        Integer,
+        ForeignKey("product_variants.id"),
+        nullable=False,
+        index=True,
+    )
 
     product_name = Column(
         String,
@@ -53,3 +65,10 @@ class OrderItem(Base):
         back_populates="items",
     )
 
+    product = relationship(
+        "Product",
+    )
+
+    variant = relationship(
+        "ProductVariant",
+    )
