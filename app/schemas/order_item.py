@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from app.schemas.product import ProductOut
 from decimal import Decimal
 
 class OrderItemCreate(BaseModel):
@@ -13,7 +14,7 @@ class OrderItemOut(BaseModel):
 
     product_id: int | None = None
     product_name: str
-
+    product: ProductOut | None = None
     quantity: int
     unit_price: Decimal
     total_price: Decimal
