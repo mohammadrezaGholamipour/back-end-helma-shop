@@ -24,9 +24,6 @@ class OrderBase(BaseModel):
     receiver_address: str
     receiver_postal_code: str | None = None
 
-    receiver_latitude: Decimal | None = None
-    receiver_longitude: Decimal | None = None
-
 
 class OrderOut(OrderBase):
     id: int

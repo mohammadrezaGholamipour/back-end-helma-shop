@@ -97,15 +97,6 @@ class Order(Base):
         nullable=False,
     )
     
-    receiver_latitude = Column(
-    Numeric(10, 7),
-    nullable=True,
-    )
-
-    receiver_longitude = Column(
-    Numeric(10, 7),
-    nullable=True,
-    )
 
     user = relationship(
         "User",

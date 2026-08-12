@@ -90,10 +90,8 @@ def create_order(
     order = Order(
         receiver_postal_code=profile.postal_code,
         receiver_first_name=profile.first_name,
-        receiver_longitude=profile.longitude,
         receiver_last_name=profile.last_name,
         receiver_mobile=current_user.mobile,
-        receiver_latitude=profile.latitude,
         receiver_address=profile.address,
 
         # Order starts as pending
