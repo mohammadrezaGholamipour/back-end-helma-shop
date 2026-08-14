@@ -2,6 +2,7 @@ from app.models.customer_profile import CustomerProfile
 from app.models.product_variant import ProductVariant
 from fastapi import APIRouter, Depends, HTTPException
 from app.schemas.order import OrderCreate, OrderOut
+from app.core.security import get_current_admin
 from app.models.order import Order, OrderStatus
 from sqlalchemy.orm import Session, joinedload
 from app.core.security import get_current_user
@@ -254,6 +255,27 @@ def create_order(
     return order
 
 
+# =====================
+# GET admin order
+# =====================
+@router.get(
+    "/admin/all",
+    response_model=list[OrderOut],
+)
+def get_all_orders(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    orders = (
+        db.query(Order)
+        .options(
+            joinedload(Order.items),
+            joinedload(Order.user),
+        )
+        .order_by(Order.id.desc())
+        .all()
+    )
+    return orders
 # =====================
 # GET MY ORDERS
 # =====================
