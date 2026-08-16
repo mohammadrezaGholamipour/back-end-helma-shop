@@ -25,6 +25,7 @@ def request_payment(
         "amount": int(amount),
         "description": description,
         "callback_url": callback_url,
+        "currency": "IRT",
     }
 
     metadata = {}
@@ -51,6 +52,7 @@ def verify_payment(amount: int, authority: str) -> dict:
         "merchant_id": settings.ZARINPAL_MERCHANT_ID,
         "amount": int(amount),
         "authority": authority,
+        "currency": "IRT",
     }
 
     response = httpx.post(url, json=payload, timeout=15)
