@@ -3,6 +3,7 @@ from app.models.product_variant import ProductVariant
 from app.models.blog_category import BlogCategory
 from app.models.order_item import OrderItem
 from app.models.category import Category
+from app.models.payment import Payment
 from app.models.product import Product
 from app.models.slider import Slider
 from app.models.store import Store

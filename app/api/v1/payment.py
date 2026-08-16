@@ -1,17 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.security import get_current_user, get_current_admin
+from app.schemas.payment import PaymentRequestOut, PaymentOut
+from fastapi import APIRouter, Depends, HTTPException
 from app.models.payment import Payment, PaymentStatus
 from app.models.order import Order, OrderStatus
 from fastapi.responses import RedirectResponse
-from app.core.security import get_current_user
+from datetime import datetime, timezone
 from app.core.config import settings
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
-from decimal import Decimal
-from typing import Optional
 import httpx
 
-
+from app.core.zarinpal_service import (
+    request_payment,
+    verify_payment,
+    get_startpay_url,
+)
 
 router = APIRouter(
     prefix="/helma-shop-api/v1/payment",
@@ -19,33 +23,22 @@ router = APIRouter(
 )
 
 
-# =========================================================
-# ZARINPAL CONFIG
-# =========================================================
-
-ZARINPAL_REQUEST_URL = "https://api.zarinpal.com/pg/v4/payment/request.json"
-
-ZARINPAL_VERIFY_URL = "https://api.zarinpal.com/pg/v4/payment/verify.json"
-
-ZARINPAL_START_PAY_URL = "https://www.zarinpal.com/pg/StartPay/"
-
-
-# =========================================================
-# CREATE PAYMENT
-# =========================================================
-
+# =====================
+# CREATE PAYMENT REQUEST
+# =====================
 
 @router.post(
-    "/zarinpal/{order_id}",
+    "/request/{order_id}",
+    response_model=PaymentRequestOut,
 )
-async def create_zarinpal_payment(
+def create_payment_request(
     order_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # =====================================================
+    # =====================
     # GET ORDER
-    # =====================================================
+    # =====================
 
     order = (
         db.query(Order)
@@ -65,10 +58,6 @@ async def create_zarinpal_payment(
             },
         )
 
-    # =====================================================
-    # CHECK ORDER STATUS
-    # =====================================================
-
     if order.status != OrderStatus.PENDING:
         raise HTTPException(
             status_code=400,
@@ -78,530 +67,229 @@ async def create_zarinpal_payment(
             },
         )
 
-    # =====================================================
-    # CHECK AMOUNT
-    # =====================================================
-
-    if order.payable_amount is None:
+    if order.payable_amount is None or order.payable_amount <= 0:
         raise HTTPException(
             status_code=400,
             detail={
-                "field": "amount",
-                "message": "مبلغ قابل پرداخت مشخص نیست",
+                "field": "order",
+                "message": "مبلغ قابل پرداخت سفارش نامعتبر است",
             },
         )
 
-    if order.payable_amount <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "field": "amount",
-                "message": "مبلغ پرداخت باید بیشتر از صفر باشد",
-            },
-        )
+    # =====================
+    # CHECK EXISTING VERIFIED PAYMENT
+    # =====================
 
-    # =====================================================
-    # CHECK EXISTING SUCCESSFUL PAYMENT
-    # =====================================================
-
-    successful_payment = (
+    already_paid = (
         db.query(Payment)
         .filter(
             Payment.order_id == order.id,
-            Payment.status == PaymentStatus.SUCCESS,
+            Payment.status == PaymentStatus.VERIFIED,
         )
         .first()
     )
 
-    if successful_payment:
+    if already_paid:
         raise HTTPException(
             status_code=400,
             detail={
-                "field": "payment",
+                "field": "order",
                 "message": "این سفارش قبلاً پرداخت شده است",
             },
         )
 
-    # =====================================================
-    # AMOUNT
-    # =====================================================
-
-    # اگر قیمت‌های دیتابیس شما تومان هستند،
-    # زرین‌پال مبلغ را به ریال دریافت می‌کند.
-    #
-    # مثال:
-    #
-    # 100000 تومان
-    # ↓
-    # 1000000 ریال
-
-    amount = int(Decimal(order.payable_amount) * 10)
-
-    # =====================================================
+    # =====================
     # CREATE PAYMENT RECORD
-    # =====================================================
+    # =====================
 
     payment = Payment(
         order_id=order.id,
         amount=order.payable_amount,
+        description=f"پرداخت سفارش شماره {order.id}",
+        mobile=current_user.mobile,
+        email=getattr(current_user, "email", None),
+        callback_url=settings.ZARINPAL_CALLBACK_URL,
         status=PaymentStatus.PENDING,
-        gateway="zarinpal",
     )
 
     db.add(payment)
     db.flush()
 
-    # =====================================================
-    # ZARINPAL REQUEST
-    # =====================================================
-
-    payload = {
-        "merchant_id": settings.ZARINPAL_MERCHANT_ID,
-        "amount": amount,
-        "description": f"پرداخت سفارش #{order.id}",
-        "callback_url": settings.ZARINPAL_CALLBACK_URL,
-        "metadata": {
-            "mobile": current_user.mobile,
-        },
-    }
+    # =====================
+    # CALL ZARINPAL REQUEST API
+    # =====================
 
     try:
-
-        async with httpx.AsyncClient(
-            timeout=30.0,
-        ) as client:
-
-            response = await client.post(
-                ZARINPAL_REQUEST_URL,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                },
-            )
-
-    except httpx.RequestError:
-
-        db.rollback()
-
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "field": "gateway",
-                "message": "ارتباط با درگاه پرداخت برقرار نشد",
-            },
+        result = request_payment(
+            amount=int(order.payable_amount),
+            description=payment.description,
+            callback_url=payment.callback_url,
+            mobile=payment.mobile,
+            email=payment.email,
         )
-
-    # =====================================================
-    # HTTP ERROR
-    # =====================================================
-
-    if response.status_code != 200:
-
-        db.rollback()
-
+    except httpx.HTTPError:
+        payment.status = PaymentStatus.FAILED
+        payment.request_message = "خطا در برقراری ارتباط با درگاه پرداخت"
+        db.commit()
         raise HTTPException(
             status_code=502,
             detail={
                 "field": "gateway",
-                "message": "درگاه پرداخت پاسخ معتبر ارسال نکرد",
+                "message": "خطا در برقراری ارتباط با درگاه پرداخت",
             },
         )
 
-    # =====================================================
-    # PARSE RESPONSE
-    # =====================================================
+    data = result.get("data") or {}
+    errors = result.get("errors") or {}
 
-    try:
-        result = response.json()
+    if data.get("code") == 100 and data.get("authority"):
+        payment.authority = data["authority"]
+        payment.request_code = data.get("code")
+        payment.request_message = data.get("message")
+        payment.status = PaymentStatus.INITIATED
 
-    except ValueError:
+        db.commit()
+        db.refresh(payment)
 
-        db.rollback()
-
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "field": "gateway",
-                "message": "پاسخ درگاه پرداخت نامعتبر است",
-            },
+        return PaymentRequestOut(
+            payment_id=payment.id,
+            authority=payment.authority,
+            payment_url=get_startpay_url(payment.authority),
         )
 
-    # =====================================================
-    # ZARINPAL ERROR
-    # =====================================================
+    # =====================
+    # REQUEST FAILED
+    # =====================
 
-    errors = result.get("errors")
-
-    if errors:
-        db.rollback()
-
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "field": "gateway",
-                "message": errors.get(
-                    "message",
-                    "خطا در ایجاد تراکنش",
-                ),
-                "code": errors.get("code"),
-            },
-        )
-
-    # =====================================================
-    # GET DATA
-    # =====================================================
-
-    data = result.get("data")
-
-    if not data:
-
-        db.rollback()
-
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "field": "gateway",
-                "message": "اطلاعات تراکنش از درگاه دریافت نشد",
-            },
-        )
-
-    # =====================================================
-    # CHECK REQUEST CODE
-    # =====================================================
-
-    if data.get("code") != 100:
-
-        db.rollback()
-
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "field": "gateway",
-                "message": data.get(
-                    "message",
-                    "خطا در ایجاد تراکنش",
-                ),
-                "code": data.get("code"),
-            },
-        )
-
-    # =====================================================
-    # AUTHORITY
-    # =====================================================
-
-    authority = data.get("authority")
-
-    if not authority:
-
-        db.rollback()
-
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "field": "gateway",
-                "message": "شناسه تراکنش از درگاه دریافت نشد",
-            },
-        )
-
-    # =====================================================
-    # SAVE AUTHORITY
-    # =====================================================
-
-    payment.authority = authority
+    payment.status = PaymentStatus.FAILED
+    payment.request_code = data.get("code")
+    payment.request_message = str(errors) if errors else "خطای نامشخص از درگاه پرداخت"
 
     db.commit()
-    db.refresh(payment)
 
-    # =====================================================
-    # PAYMENT URL
-    # =====================================================
-
-    payment_url = f"{ZARINPAL_START_PAY_URL}{authority}"
-
-    return {
-        "payment_id": payment.id,
-        "order_id": order.id,
-        "authority": authority,
-        "payment_url": payment_url,
-    }
+    raise HTTPException(
+        status_code=400,
+        detail={
+            "field": "gateway",
+            "message": "خطا در ایجاد درخواست پرداخت",
+            "gateway_errors": errors,
+        },
+    )
 
 
-# =========================================================
+# =====================
 # ZARINPAL CALLBACK
-# =========================================================
+# =====================
+# این مسیر خودِ زرین‌پال (نه فرانت) صدا می‌زند، پس بدون احراز هویت کاربر است.
 
-
-@router.get(
-    "/zarinpal/callback",
-)
-async def zarinpal_callback(
-    Authority: str = Query(...),
-    Status: str = Query(...),
+@router.get("/callback")
+def payment_callback(
+    Authority: str,
+    Status: str,
     db: Session = Depends(get_db),
 ):
-    # =====================================================
-    # FIND PAYMENT
-    # =====================================================
-
     payment = (
         db.query(Payment)
-        .filter(
-            Payment.authority == Authority,
-        )
+        .filter(Payment.authority == Authority)
         .first()
     )
 
     if not payment:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "field": "payment",
-                "message": "تراکنش مورد نظر یافت نشد",
-            },
-        )
-
-    # =====================================================
-    # GET ORDER
-    # =====================================================
-
-    order = (
-        db.query(Order)
-        .filter(
-            Order.id == payment.order_id,
-        )
-        .first()
-    )
-
-    if not order:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "field": "order",
-                "message": "سفارش مربوط به تراکنش یافت نشد",
-            },
-        )
-
-    # =====================================================
-    # ALREADY SUCCESSFUL
-    # =====================================================
-
-    if payment.status == PaymentStatus.SUCCESS:
-
         return RedirectResponse(
-            url=(
-                f"{settings.FRONTEND_URL}"
-                f"/payment/result"
-                f"?status=success"
-                f"&order_id={order.id}"
-                f"&ref_id={payment.ref_id}"
-            )
+            url=f"{settings.FRONTEND_PAYMENT_RESULT_URL}?status=not_found",
         )
 
-    # =====================================================
-    # USER CANCELLED / FAILED
-    # =====================================================
+    order = db.query(Order).filter(Order.id == payment.order_id).first()
 
-    if Status.upper() != "OK":
+    # =====================
+    # USER CANCELLED
+    # =====================
 
-        payment.status = PaymentStatus.FAILED
-
+    if Status != "OK":
+        payment.status = PaymentStatus.CANCELLED
         db.commit()
 
         return RedirectResponse(
-            url=(
-                f"{settings.FRONTEND_URL}"
-                f"/payment/result"
-                f"?status=failed"
-                f"&order_id={order.id}"
-            )
+            url=f"{settings.FRONTEND_PAYMENT_RESULT_URL}"
+                f"?status=cancelled&order_id={payment.order_id}",
         )
 
-    # =====================================================
-    # CHECK PAYMENT AMOUNT
-    # =====================================================
-
-    amount = int(Decimal(payment.amount) * 10)
-
-    # =====================================================
-    # VERIFY
-    # =====================================================
-
-    payload = {
-        "merchant_id": settings.ZARINPAL_MERCHANT_ID,
-        "authority": Authority,
-        "amount": amount,
-    }
+    # =====================
+    # VERIFY WITH ZARINPAL
+    # =====================
 
     try:
-
-        async with httpx.AsyncClient(
-            timeout=30.0,
-        ) as client:
-
-            response = await client.post(
-                ZARINPAL_VERIFY_URL,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                },
-            )
-
-    except httpx.RequestError:
-
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "field": "gateway",
-                "message": "ارتباط با درگاه برای تایید پرداخت برقرار نشد",
-            },
+        result = verify_payment(
+            amount=int(payment.amount),
+            authority=Authority,
         )
-
-    # =====================================================
-    # HTTP ERROR
-    # =====================================================
-
-    if response.status_code != 200:
-
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "field": "gateway",
-                "message": "پاسخ نامعتبر از درگاه دریافت شد",
-            },
-        )
-
-    # =====================================================
-    # PARSE RESPONSE
-    # =====================================================
-
-    try:
-        result = response.json()
-
-    except ValueError:
-
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "field": "gateway",
-                "message": "پاسخ Verify درگاه نامعتبر است",
-            },
-        )
-
-    # =====================================================
-    # VERIFY ERROR
-    # =====================================================
-
-    errors = result.get("errors")
-
-    if errors:
-
+    except httpx.HTTPError:
         payment.status = PaymentStatus.FAILED
-
+        payment.verify_message = "خطا در برقراری ارتباط با درگاه پرداخت"
         db.commit()
 
         return RedirectResponse(
-            url=(
-                f"{settings.FRONTEND_URL}"
-                f"/payment/result"
-                f"?status=failed"
-                f"&order_id={order.id}"
-            )
+            url=f"{settings.FRONTEND_PAYMENT_RESULT_URL}"
+                f"?status=failed&order_id={payment.order_id}",
         )
-
-    # =====================================================
-    # VERIFY DATA
-    # =====================================================
 
     data = result.get("data") or {}
+    errors = result.get("errors") or {}
 
-    code = data.get("code")
+    # کد 100 یعنی تأیید موفق تازه، 101 یعنی این تراکنش قبلاً هم تأیید شده بود
+    if data.get("code") in (100, 101):
+        payment.status = PaymentStatus.VERIFIED
+        payment.ref_id = str(data.get("ref_id"))
+        payment.verify_code = data.get("code")
+        payment.verify_message = data.get("message")
+        payment.card_pan = data.get("card_pan")
+        payment.card_hash = data.get("card_hash")
+        payment.fee_type = data.get("fee_type")
+        payment.fee = data.get("fee")
+        payment.verified_at = datetime.now(timezone.utc)
 
-    # =====================================================
-    # SUCCESS
-    # =====================================================
-
-    if code == 100:
-
-        ref_id = data.get("ref_id")
-
-        payment.status = PaymentStatus.SUCCESS
-        payment.ref_id = str(ref_id) if ref_id is not None else None
-
-        order.status = OrderStatus.PROCESSING
-
-        db.commit()
-
-        return RedirectResponse(
-            url=(
-                f"{settings.FRONTEND_URL}"
-                f"/payment/result"
-                f"?status=success"
-                f"&order_id={order.id}"
-                f"&ref_id={payment.ref_id}"
-            )
-        )
-
-    # =====================================================
-    # ALREADY VERIFIED
-    # =====================================================
-
-    if code == 101:
-
-        payment.status = PaymentStatus.SUCCESS
-
-        ref_id = data.get("ref_id")
-
-        if ref_id is not None:
-            payment.ref_id = str(ref_id)
-
-        order.status = OrderStatus.PROCESSING
+        if order:
+            order.status = OrderStatus.PROCESSING
 
         db.commit()
 
         return RedirectResponse(
-            url=(
-                f"{settings.FRONTEND_URL}"
-                f"/payment/result"
-                f"?status=success"
-                f"&order_id={order.id}"
-                f"&ref_id={payment.ref_id or ''}"
-            )
+            url=f"{settings.FRONTEND_PAYMENT_RESULT_URL}"
+                f"?status=success&order_id={payment.order_id}&ref_id={payment.ref_id}",
         )
 
-    # =====================================================
-    # PAYMENT FAILED
-    # =====================================================
+    # =====================
+    # VERIFY FAILED
+    # =====================
 
     payment.status = PaymentStatus.FAILED
+    payment.verify_code = data.get("code")
+    payment.verify_message = str(errors) if errors else "تأیید تراکنش ناموفق بود"
 
     db.commit()
 
     return RedirectResponse(
-        url=(
-            f"{settings.FRONTEND_URL}"
-            f"/payment/result"
-            f"?status=failed"
-            f"&order_id={order.id}"
-        )
+        url=f"{settings.FRONTEND_PAYMENT_RESULT_URL}"
+            f"?status=failed&order_id={payment.order_id}",
     )
 
 
-# =========================================================
-# GET PAYMENT STATUS
-# =========================================================
-
+# =====================
+# GET MY PAYMENT
+# =====================
 
 @router.get(
     "/{payment_id}",
+    response_model=PaymentOut,
 )
-def get_payment(
+def get_my_payment(
     payment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     payment = (
         db.query(Payment)
-        .join(Order)
+        .join(Order, Order.id == Payment.order_id)
         .filter(
             Payment.id == payment_id,
             Order.user_id == current_user.id,
@@ -618,12 +306,27 @@ def get_payment(
             },
         )
 
-    return {
-        "id": payment.id,
-        "order_id": payment.order_id,
-        "amount": payment.amount,
-        "status": payment.status,
-        "gateway": payment.gateway,
-        "authority": payment.authority,
-        "ref_id": payment.ref_id,
-    }
+    return payment
+
+
+# =====================
+# ADMIN: GET PAYMENTS OF AN ORDER
+# =====================
+
+@router.get(
+    "/admin/order/{order_id}",
+    response_model=list[PaymentOut],
+)
+def get_order_payments_admin(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    payments = (
+        db.query(Payment)
+        .filter(Payment.order_id == order_id)
+        .order_by(Payment.id.desc())
+        .all()
+    )
+
+    return payments

@@ -96,7 +96,6 @@ class Order(Base):
         Numeric(12, 2),
         nullable=False,
     )
-    
 
     user = relationship(
         "User",
@@ -108,9 +107,9 @@ class Order(Base):
         back_populates="order",
         cascade="all, delete-orphan",
     )
-    
+
     payments = relationship(
-    "Payment",
-    back_populates="order",
-    cascade="all, delete-orphan",
-)
+        "Payment",
+        back_populates="order",
+        cascade="all, delete-orphan",
+    )
