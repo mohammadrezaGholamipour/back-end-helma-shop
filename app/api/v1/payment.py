@@ -1,26 +1,62 @@
-from app.core.security import get_current_user, get_current_admin
-from app.schemas.payment import PaymentRequestOut, PaymentOut
-from fastapi import APIRouter, Depends, HTTPException
-from app.models.payment import Payment, PaymentStatus
-from app.models.order import Order, OrderStatus
-from fastapi.responses import RedirectResponse
-from datetime import datetime, timezone
-from app.core.config import settings
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.models.user import User
 import httpx
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.security import get_current_user, get_current_admin
 from app.core.zarinpal_service import (
     request_payment,
     verify_payment,
     get_startpay_url,
 )
+from app.db.session import get_db
+from app.models.order import Order, OrderStatus
+from app.models.payment import Payment, PaymentStatus
+from app.models.user import User
+from app.schemas.payment import PaymentRequestOut, PaymentOut
 
 router = APIRouter(
     prefix="/helma-shop-api/v1/payment",
     tags=["Payment"],
 )
+
+
+# =====================
+# BUILD PAYMENT DESCRIPTION FROM ORDER ITEMS
+# =====================
+
+def build_payment_description(order: Order, max_length: int = 200) -> str:
+    """
+    به‌جای فقط شماره‌ی سفارش، خلاصه‌ای از کالاهای سفارش رو می‌سازه؛
+    مثلاً: «سفارش #۱۲۳: ۲ کیلو زعفران، ۱ بسته سوهان × ۳ قلم دیگر»
+    """
+    items = order.items or []
+
+    if not items:
+        return f"پرداخت سفارش شماره {order.id}"
+
+    parts = []
+    for item in items:
+        name = item.product_name or "کالا"
+        parts.append(f"{item.quantity} {name}")
+
+    # برای اینکه description خیلی طولانی نشه (محدودیت زرین‌پال)
+    max_items_shown = 3
+    shown = parts[:max_items_shown]
+    remaining = len(parts) - len(shown)
+
+    summary = "، ".join(shown)
+    if remaining > 0:
+        summary += f" و {remaining} قلم دیگر"
+
+    description = f"سفارش شماره {order.id}: {summary}"
+
+    if len(description) > max_length:
+        description = description[: max_length - 1] + "…"
+
+    return description
 
 
 # =====================
@@ -105,7 +141,7 @@ def create_payment_request(
     payment = Payment(
         order_id=order.id,
         amount=order.payable_amount,
-        description=f"پرداخت سفارش شماره {order.id}",
+        description=build_payment_description(order),
         mobile=current_user.mobile,
         email=getattr(current_user, "email", None),
         callback_url=settings.ZARINPAL_CALLBACK_URL,
