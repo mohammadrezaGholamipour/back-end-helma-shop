@@ -1,7 +1,7 @@
+from app.schemas.order import OrderCreate, OrderOut, OrderStatusUpdate
 from app.models.customer_profile import CustomerProfile
 from app.models.product_variant import ProductVariant
 from fastapi import APIRouter, Depends, HTTPException
-from app.schemas.order import OrderCreate, OrderOut
 from app.core.security import get_current_admin
 from app.models.order import Order, OrderStatus
 from sqlalchemy.orm import Session, joinedload
@@ -368,3 +368,40 @@ def delete_order(
     db.query(OrderItem).filter(OrderItem.order_id == order.id).delete()
     db.delete(order)
     db.commit()
+    
+    
+
+@router.patch(
+    "/admin/{order_id}/status",
+    response_model=OrderOut,
+)
+def update_order_status(
+    order_id: int,
+    data: OrderStatusUpdate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    order = (
+        db.query(Order)
+        .options(
+            joinedload(Order.items),
+            joinedload(Order.user),
+        )
+        .filter(Order.id == order_id)
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "field": "order",
+                "message": "سفارش مورد نظر یافت نشد",
+            },
+        )
+
+    order.status = data.status
+    db.commit()
+    db.refresh(order)
+
+    return order
