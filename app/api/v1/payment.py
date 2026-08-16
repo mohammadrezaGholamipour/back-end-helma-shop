@@ -40,7 +40,7 @@ def build_payment_description(order: Order, max_length: int = 200) -> str:
     parts = []
     for item in items:
         name = item.product_name or "کالا"
-        parts.append(f"{item.quantity} {name}")
+        parts.append(f"{name}")
 
     # برای اینکه description خیلی طولانی نشه (محدودیت زرین‌پال)
     max_items_shown = 3
@@ -51,7 +51,7 @@ def build_payment_description(order: Order, max_length: int = 200) -> str:
     if remaining > 0:
         summary += f" و {remaining} قلم دیگر"
 
-    description = f"سفارش شماره {order.id}: {summary}"
+    description = f"{summary}"
 
     if len(description) > max_length:
         description = description[: max_length - 1] + "…"
